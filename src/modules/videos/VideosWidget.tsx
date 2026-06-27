@@ -32,8 +32,18 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
   const [isMuted, setIsMuted] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(true);
   const [fileIds, setFileIds] = useState<string[]>([]);
+  const [blobUrl, setBlobUrl] = useState<string>('');
 
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (activeVideo) {
+      const url = URL.createObjectURL(activeVideo.blob);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setBlobUrl('');
+  }, [activeVideo]);
 
   // Sync fileIds from dataRef
   useEffect(() => {
@@ -157,7 +167,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
             {/* HTML5 video element */}
             <video
               ref={videoRef}
-              src={URL.createObjectURL(activeVideo.blob)}
+              src={blobUrl}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               onClick={togglePlay}

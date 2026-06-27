@@ -31,8 +31,18 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
   const [isMuted, setIsMuted] = useState(false);
   const [showPlaylist, setShowPlaylist] = useState(true);
   const [fileIds, setFileIds] = useState<string[]>([]);
+  const [blobUrl, setBlobUrl] = useState<string>('');
 
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  useEffect(() => {
+    if (activeAudio) {
+      const url = URL.createObjectURL(activeAudio.blob);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setBlobUrl('');
+  }, [activeAudio]);
 
   // Sync fileIds from dataRef
   useEffect(() => {
@@ -149,7 +159,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
             {/* HTML5 audio element (hidden, controlled via custom UI) */}
             <audio
               ref={audioRef}
-              src={URL.createObjectURL(activeAudio.blob)}
+              src={blobUrl}
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
               className="hidden"

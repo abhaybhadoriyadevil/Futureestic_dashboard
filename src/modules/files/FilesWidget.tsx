@@ -120,11 +120,12 @@ const VideoPreview: React.FC<{ file: FileData }> = ({ file }) => {
   const [muted, setMuted] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const blobUrl = useRef<string>('');
+  const [blobUrl, setBlobUrl] = useState<string>('');
 
   useEffect(() => {
-    blobUrl.current = URL.createObjectURL(file.blob);
-    return () => URL.revokeObjectURL(blobUrl.current);
+    const url = URL.createObjectURL(file.blob);
+    setBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
   }, [file.blob]);
 
   const toggle = () => {
@@ -140,7 +141,7 @@ const VideoPreview: React.FC<{ file: FileData }> = ({ file }) => {
       <div className="relative flex-1 rounded-xl overflow-hidden bg-black group/vp">
         <video
           ref={videoRef}
-          src={blobUrl.current}
+          src={blobUrl}
           className="w-full h-full object-contain"
           onClick={toggle}
           onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
@@ -209,11 +210,12 @@ const AudioPreview: React.FC<{ file: FileData }> = ({ file }) => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
-  const blobUrl = useRef<string>('');
+  const [blobUrl, setBlobUrl] = useState<string>('');
 
   useEffect(() => {
-    blobUrl.current = URL.createObjectURL(file.blob);
-    return () => URL.revokeObjectURL(blobUrl.current);
+    const url = URL.createObjectURL(file.blob);
+    setBlobUrl(url);
+    return () => URL.revokeObjectURL(url);
   }, [file.blob]);
 
   const toggle = () => {
@@ -301,7 +303,7 @@ const AudioPreview: React.FC<{ file: FileData }> = ({ file }) => {
 
       <audio
         ref={audioRef}
-        src={blobUrl.current}
+        src={blobUrl}
         onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
         onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
         onEnded={() => setPlaying(false)}
