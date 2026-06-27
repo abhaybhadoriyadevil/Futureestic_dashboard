@@ -1,0 +1,226 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-primary-bg: var(--primary-bg);
+  --color-secondary-bg: var(--secondary-bg);
+  --color-card-bg: var(--card-bg);
+  --color-glass-bg: var(--glass-bg);
+  --color-glass-border: var(--glass-border);
+  
+  --color-blue-accent: var(--blue-accent);
+  --color-purple-accent: var(--purple-accent);
+  --color-cyan-accent: var(--cyan-accent);
+  --color-green-accent: var(--green-accent);
+  
+  --color-primary-text: var(--primary-text);
+  --color-secondary-text: var(--secondary-text);
+  --color-muted-text: var(--muted-text);
+  --color-border-color: var(--border-color);
+  
+  --font-sans: 'Outfit', 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  --primary-bg: #050507;
+  --secondary-bg: #0e0e12;
+  --card-bg: rgba(14, 14, 18, 0.6);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.06);
+  
+  --blue-accent: #3b82f6;
+  --purple-accent: #8b5cf6;
+  --cyan-accent: #06b6d4;
+  --green-accent: #10b981;
+  
+  --primary-text: #ffffff;
+  --secondary-text: #9ca3af;
+  --muted-text: #4b5563;
+  --border-color: rgba(255, 255, 255, 0.06);
+  
+  --glow-color: rgba(6, 182, 212, 0.15);
+  --shadow-main: 0 10px 40px -10px rgba(0, 0, 0, 0.8), 0 0 20px rgba(6, 182, 212, 0.03);
+  --canvas-grid: rgba(255, 255, 255, 0.015);
+}
+
+:root[data-theme="light"] {
+  --primary-bg: #f4f5f8;
+  --secondary-bg: #ffffff;
+  --card-bg: #ffffff;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  
+  --blue-accent: #2563eb;
+  --purple-accent: #7c3aed;
+  --cyan-accent: #0891b2;
+  --green-accent: #059669;
+  
+  --primary-text: #0f172a;
+  --secondary-text: #475569;
+  --muted-text: #94a3b8;
+  --border-color: #e2e8f0;
+  
+  --glow-color: rgba(37, 99, 235, 0.05);
+  --shadow-main: 0 10px 30px -10px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --canvas-grid: rgba(0, 0, 0, 0.025);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  transition: background-color 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--primary-bg);
+  color: var(--primary-text);
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--glass-border);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--secondary-text);
+  opacity: 0.5;
+}
+
+/* Background animated glow mesh for Dark Mode */
+.mesh-gradient-dark {
+  background-color: #050507;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(139, 92, 246, 0.06) 0px, transparent 50%),
+    radial-gradient(at 90% 10%, rgba(6, 182, 212, 0.06) 0px, transparent 50%),
+    radial-gradient(at 50% 80%, rgba(59, 130, 246, 0.04) 0px, transparent 50%);
+}
+
+/* Background gradient for Light Mode */
+.mesh-gradient-light {
+  background-color: #f4f5f8;
+  background-image: 
+    radial-gradient(at 10% 20%, rgba(124, 58, 237, 0.03) 0px, transparent 40%),
+    radial-gradient(at 90% 10%, rgba(37, 99, 235, 0.03) 0px, transparent 40%);
+}
+
+/* Canvas Grid Pattern */
+.canvas-grid-pattern {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, var(--canvas-grid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--canvas-grid) 1px, transparent 1px);
+}
+
+/* Glassmorphism Styles */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--shadow-main);
+}
+
+.glass-panel-glow:hover {
+  border-color: rgba(6, 182, 212, 0.3);
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.8), 0 0 25px rgba(6, 182, 212, 0.15);
+}
+
+/* Scrollable Container without visible bar if needed */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Code editor style overrides */
+pre, code {
+  font-family: var(--font-mono);
+}
+
+/* Selection */
+::selection {
+  background: var(--cyan-accent);
+  color: #000;
+}
+
+/* Boot Loader Scan Line Animation */
+@keyframes scanline {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes bootGlow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes gridReveal {
+  0% { opacity: 0; transform: scale(1.02); }
+  100% { opacity: 0.6; transform: scale(1); }
+}
+
+/* Widget glow-on-hover pulse */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(6, 182, 212, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(6, 182, 212, 0.5); }
+}
+
+.widget-glow-hover:hover {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Cyber scan line decorative element */
+.scan-line {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, rgba(6, 182, 212, 0.4), transparent);
+  animation: scanline 6s linear infinite;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Futuristic neon border glow utility */
+.neon-border-cyan {
+  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 10px rgba(6, 182, 212, 0.2), inset 0 0 10px rgba(6, 182, 212, 0.02);
+}
+
+.neon-border-purple {
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.2), inset 0 0 10px rgba(139, 92, 246, 0.02);
+}
+
+/* Animated badge for edit mode */
+@keyframes editPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4);
+    border-color: rgba(139, 92, 246, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(139, 92, 246, 0);
+    border-color: rgba(139, 92, 246, 0.7);
+  }
+}
+
+.edit-mode-badge {
+  animation: editPulse 2s ease-in-out infinite;
+}
