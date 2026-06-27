@@ -19,9 +19,10 @@ interface MindMapWidgetProps {
   widgetId: string;
   dataRef?: string; // Stores JSON string: { nodes: MindNode[], connections: Connection[] }
   isEditMode: boolean;
+  showControls?: boolean;
 }
 
-export const MindMapWidget: React.FC<MindMapWidgetProps> = ({ widgetId, dataRef }) => {
+export const MindMapWidget: React.FC<MindMapWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
 
   const [nodes, setNodes] = useState<MindNode[]>([]);
@@ -166,38 +167,40 @@ export const MindMapWidget: React.FC<MindMapWidgetProps> = ({ widgetId, dataRef 
       onPointerUp={handlePointerUp}
     >
       {/* HUD Toolbar */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex gap-2">
-          <button
-            onClick={handleAddNode}
-            className="px-2.5 py-1 bg-cyan-accent text-black font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer hover:opacity-90"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Add Idea</span>
-          </button>
+      {showControls && (
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex gap-2">
+            <button
+              onClick={handleAddNode}
+              className="px-2.5 py-1 bg-cyan-accent text-black font-semibold rounded-lg flex items-center gap-1.5 cursor-pointer hover:opacity-90"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add Idea</span>
+            </button>
+            
+            <button
+              onClick={() => {
+                setIsConnectMode(!isConnectMode);
+                setConnectionSourceId(null);
+              }}
+              className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 cursor-pointer transition-colors ${
+                isConnectMode
+                  ? 'border-cyan-accent bg-cyan-accent/15 text-cyan-accent shadow-[0_0_8px_rgba(6,182,212,0.15)] animate-pulse'
+                  : 'border-color-border-color bg-glass-bg text-secondary-text hover:text-primary-text hover:border-cyan-accent'
+              }`}
+            >
+              <GitPullRequest className="w-3.5 h-3.5" />
+              <span>{isConnectMode ? 'Link Mode Active' : 'Link Nodes'}</span>
+            </button>
+          </div>
           
-          <button
-            onClick={() => {
-              setIsConnectMode(!isConnectMode);
-              setConnectionSourceId(null);
-            }}
-            className={`px-2.5 py-1 rounded-lg border flex items-center gap-1.5 cursor-pointer transition-colors ${
-              isConnectMode
-                ? 'border-cyan-accent bg-cyan-accent/15 text-cyan-accent shadow-[0_0_8px_rgba(6,182,212,0.15)] animate-pulse'
-                : 'border-color-border-color bg-glass-bg text-secondary-text hover:text-primary-text hover:border-cyan-accent'
-            }`}
-          >
-            <GitPullRequest className="w-3.5 h-3.5" />
-            <span>{isConnectMode ? 'Link Mode Active' : 'Link Nodes'}</span>
-          </button>
+          {isConnectMode && (
+            <span className="text-[10px] text-cyan-accent font-bold animate-[pulse_2s_infinite]">
+              {connectionSourceId ? 'Select second node to link...' : 'Select source node to link...'}
+            </span>
+          )}
         </div>
-        
-        {isConnectMode && (
-          <span className="text-[10px] text-cyan-accent font-bold animate-[pulse_2s_infinite]">
-            {connectionSourceId ? 'Select second node to link...' : 'Select source node to link...'}
-          </span>
-        )}
-      </div>
+      )}
 
       {/* SVG Canvas Board */}
       <div className="flex-1 rounded-xl border border-color-border-color bg-glass-bg/10 relative overflow-hidden">
@@ -266,8 +269,8 @@ export const MindMapWidget: React.FC<MindMapWidgetProps> = ({ widgetId, dataRef 
           })}
         </svg>
 
-        {/* Selected Node Editor Popup Panel */}
-        {selectedNodeId && getNode(selectedNodeId) && (
+        {/* Node detail and edit popover panel */}
+        {showControls && selectedNodeId && getNode(selectedNodeId) && (
           <div className="absolute bottom-3 left-3 right-3 glass-panel rounded-xl px-3 py-2 border border-color-border-color flex justify-between items-center gap-4 z-10 shadow-xl animate-[fadeIn_0.15s_ease-out]">
             <div className="flex-1 flex gap-2 items-center">
               <input

@@ -21,9 +21,10 @@ interface FilesWidgetProps {
   widgetId: string;
   dataRef?: string;
   isEditMode: boolean;
+  showControls?: boolean;
 }
 
-export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef }) => {
+export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -168,63 +169,67 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef }) =
     <div className="w-full h-full flex flex-col p-4 text-xs text-primary-text bg-transparent overflow-hidden">
       
       {/* Search and upload bar */}
-      <div className="flex gap-3 mb-3">
-        <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-xl border border-color-border-color bg-glass-bg/40 focus-within:border-cyan-accent">
-          <Search className="w-4 h-4 text-muted-text" />
-          <input
-            type="text"
-            placeholder="Search local documents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent text-xs focus:outline-none text-primary-text"
-          />
-        </div>
+      {showControls && (
+        <div className="flex gap-3 mb-3">
+          <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-xl border border-color-border-color bg-glass-bg/40 focus-within:border-cyan-accent">
+            <Search className="w-4 h-4 text-muted-text" />
+            <input
+              type="text"
+              placeholder="Search local documents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent text-xs focus:outline-none text-primary-text"
+            />
+          </div>
 
-        {/* Upload Button */}
-        <label className="px-3.5 py-1.5 rounded-xl bg-cyan-accent text-black font-semibold flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity">
-          <Upload className="w-4 h-4" />
-          <span>Upload</span>
-          <input
-            type="file"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-        </label>
-      </div>
+          {/* Upload Button */}
+          <label className="px-3.5 py-1.5 rounded-xl bg-cyan-accent text-black font-semibold flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity">
+            <Upload className="w-4 h-4" />
+            <span>Upload</span>
+            <input
+              type="file"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </label>
+        </div>
+      )}
 
       {/* Categories and Statistics Summary */}
-      <div className="flex justify-between items-center mb-3">
-        <div className="flex flex-wrap gap-1">
-          <button
-            onClick={() => setSelectedCategory(null)}
-            className={`px-2.5 py-1 rounded-lg border text-[10px] cursor-pointer transition-colors ${
-              selectedCategory === null 
-                ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent' 
-                : 'border-color-border-color text-muted-text hover:text-secondary-text'
-            }`}
-          >
-            All Categories
-          </button>
-          {categories.map(c => (
+      {showControls && (
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex flex-wrap gap-1">
             <button
-              key={c}
-              onClick={() => setSelectedCategory(c)}
+              onClick={() => setSelectedCategory(null)}
               className={`px-2.5 py-1 rounded-lg border text-[10px] cursor-pointer transition-colors ${
-                selectedCategory === c 
+                selectedCategory === null 
                   ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent' 
                   : 'border-color-border-color text-muted-text hover:text-secondary-text'
               }`}
             >
-              {c}
+              All Categories
             </button>
-          ))}
+            {categories.map(c => (
+              <button
+                key={c}
+                onClick={() => setSelectedCategory(c)}
+                className={`px-2.5 py-1 rounded-lg border text-[10px] cursor-pointer transition-colors ${
+                  selectedCategory === c 
+                    ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent' 
+                    : 'border-color-border-color text-muted-text hover:text-secondary-text'
+                }`}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+          
+          {/* Storage Size Card */}
+          <span className="text-[10px] text-muted-text font-semibold whitespace-nowrap">
+            DB Storage: {(totalSize / (1024 * 1024)).toFixed(2)} MB
+          </span>
         </div>
-        
-        {/* Storage Size Card */}
-        <span className="text-[10px] text-muted-text font-semibold whitespace-nowrap">
-          DB Storage: {(totalSize / (1024 * 1024)).toFixed(2)} MB
-        </span>
-      </div>
+      )}
 
       {/* Files Grid View */}
       <div className="flex-1 overflow-y-auto space-y-1.5 no-scrollbar pr-0.5">
@@ -268,13 +273,15 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef }) =
                   <Download className="w-3.5 h-3.5" />
                 </button>
                 
-                <button
-                  onClick={() => handleDelete(f.id)}
-                  className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-red-500 cursor-pointer"
-                  title="Delete file"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {showControls && (
+                  <button
+                    onClick={() => handleDelete(f.id)}
+                    className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-red-500 cursor-pointer"
+                    title="Delete file"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           ))

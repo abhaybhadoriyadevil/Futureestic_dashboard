@@ -20,9 +20,10 @@ interface VideosWidgetProps {
   widgetId: string;
   dataRef?: string;
   isEditMode: boolean;
+  showControls?: boolean;
 }
 
-export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef }) => {
+export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -222,16 +223,18 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef })
             {activeVideo?.name || 'Local Media OS'}
           </span>
           
-          <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
-            <Upload className="w-3.5 h-3.5 text-cyan-accent" />
-            <span>Upload MP4</span>
-            <input
-              type="file"
-              accept="video/mp4,video/webm"
-              onChange={handleUploadVideo}
-              className="hidden"
-            />
-          </label>
+          {showControls && (
+            <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
+              <Upload className="w-3.5 h-3.5 text-cyan-accent" />
+              <span>Upload MP4</span>
+              <input
+                type="file"
+                accept="video/mp4,video/webm"
+                onChange={handleUploadVideo}
+                className="hidden"
+              />
+            </label>
+          )}
         </div>
       </div>
 

@@ -509,33 +509,35 @@ export const TablesWidget: React.FC<TablesWidgetProps> = ({ dataRef, showControl
                       </td>
                     ))}
 
-                    <td className="w-16 px-4 py-2 flex justify-center gap-1">
-                      {isEditingThisRow ? (
+                    {showControls && (
+                      <td className="w-16 px-4 py-2 flex justify-center gap-1">
+                        {isEditingThisRow ? (
+                          <button
+                            onClick={() => handleSaveRow(absIdx)}
+                            className="p-1 rounded bg-cyan-accent text-black hover:opacity-90 cursor-pointer"
+                            title="Save inline row"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleStartEditRow(absIdx, row)}
+                            className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer"
+                            title="Edit row"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        
                         <button
-                          onClick={() => handleSaveRow(absIdx)}
-                          className="p-1 rounded bg-cyan-accent text-black hover:opacity-90 cursor-pointer"
-                          title="Save inline row"
+                          onClick={() => handleDeleteRow(absIdx)}
+                          className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-red-500 cursor-pointer"
+                          title="Delete row"
                         >
-                          <Check className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      ) : (
-                        <button
-                          onClick={() => handleStartEditRow(absIdx, row)}
-                          className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer"
-                          title="Edit row"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => handleDeleteRow(absIdx)}
-                        className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-red-500 cursor-pointer"
-                        title="Delete row"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </td>
+                      </td>
+                    )}
                   </tr>
                 );
               })

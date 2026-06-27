@@ -20,9 +20,10 @@ interface ImagesWidgetProps {
   widgetId: string;
   dataRef?: string;
   isEditMode: boolean;
+  showControls?: boolean;
 }
 
-export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef }) => {
+export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
   const [viewMode, setViewMode] = useState<'grid' | 'masonry' | 'slideshow'>('grid');
   const [fileIds, setFileIds] = useState<string[]>([]);
@@ -126,49 +127,51 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef })
     <div className="w-full h-full flex flex-col p-4 text-xs text-primary-text bg-transparent overflow-hidden">
       
       {/* View mode toggle controls */}
-      <div className="flex justify-between items-center mb-3 gap-2">
-        <div className="flex rounded-xl bg-glass-bg border border-color-border-color p-0.5">
-          <button
-            onClick={() => { setViewMode('grid'); setIsPlaying(false); }}
-            className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
-              viewMode === 'grid' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'
-            }`}
-            title="Grid View"
-          >
-            <Grid className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => { setViewMode('masonry'); setIsPlaying(false); }}
-            className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
-              viewMode === 'masonry' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'
-            }`}
-            title="Masonry View"
-          >
-            <Layers3 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => setViewMode('slideshow')}
-            className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
-              viewMode === 'slideshow' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'
-            }`}
-            title="Slideshow View"
-          >
-            <Play className="w-3.5 h-3.5" />
-          </button>
-        </div>
+      {showControls && (
+        <div className="flex justify-between items-center mb-3 gap-2">
+          <div className="flex rounded-xl bg-glass-bg border border-color-border-color p-0.5">
+            <button
+              onClick={() => { setViewMode('grid'); setIsPlaying(false); }}
+              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                viewMode === 'grid' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'
+              }`}
+              title="Grid View"
+            >
+              <Grid className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => { setViewMode('masonry'); setIsPlaying(false); }}
+              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                viewMode === 'masonry' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'
+              }`}
+              title="Masonry View"
+            >
+              <Layers3 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => setViewMode('slideshow')}
+              className={`p-1.5 rounded-lg cursor-pointer transition-colors ${
+                viewMode === 'slideshow' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'
+              }`}
+              title="Slideshow View"
+            >
+              <Play className="w-3.5 h-3.5" />
+            </button>
+          </div>
 
-        {/* Upload Trigger */}
-        <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent text-[10px] font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
-          <Upload className="w-3.5 h-3.5 text-cyan-accent" />
-          <span>Upload Image</span>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleUploadImage}
-            className="hidden"
-          />
-        </label>
-      </div>
+          {/* Upload Trigger */}
+          <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent text-[10px] font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
+            <Upload className="w-3.5 h-3.5 text-cyan-accent" />
+            <span>Upload Image</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleUploadImage}
+              className="hidden"
+            />
+          </label>
+        </div>
+      )}
 
       {/* Gallery content body */}
       <div className="flex-1 overflow-y-auto no-scrollbar">
