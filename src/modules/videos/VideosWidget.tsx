@@ -229,7 +229,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
               <span>Upload MP4</span>
               <input
                 type="file"
-                accept="video/mp4,video/webm"
+                accept="video/*,video/mp4,video/webm,video/ogg,video/mov,video/mkv,video/avi,.mp4,.webm,.ogg,.mov,.mkv,.avi"
                 onChange={handleUploadVideo}
                 className="hidden"
               />

@@ -1,4 +1,5 @@
-import React, { useRef, useState, useEffect, Suspense } from 'react';
+import React, { useRef, useState, useEffect, Suspense, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Widget } from '../../types';
 import { useWidgetStore } from '../../stores/useWidgetStore';
@@ -97,6 +98,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const { copyWidget } = useClipboardStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const dropdownBtnRef = useRef<HTMLButtonElement>(null);
+  const dropdownPanelRef = useRef<HTMLDivElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
   
   // Dragging states
   const [isDragging, setIsDragging] = useState(false);
@@ -131,12 +135,42 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [inlineTitleValue, setInlineTitleValue] = useState(widget.title);
   
   const [showDropdown, setShowDropdown] = useState(false);
+
+  const openDropdown = useCallback(() => {
+    if (dropdownBtnRef.current) {
+      const rect = dropdownBtnRef.current.getBoundingClientRect();
+      const dropdownWidth = 192; // w-48 = 12rem = 192px
+      const dropdownHeight = 330; // approx menu height
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+
+      // Default: align right edge with button right, drop below
+      let top = rect.bottom + 4;
+      let right = viewportWidth - rect.right;
+
+      // Flip up if not enough space below
+      if (top + dropdownHeight > viewportHeight - 8) {
+        top = rect.top - dropdownHeight - 4;
+      }
+      // Ensure right edge doesn't go off-screen left
+      if (viewportWidth - right + dropdownWidth > viewportWidth) {
+        right = viewportWidth - rect.left - dropdownWidth;
+      }
+
+      setDropdownPos({ top, right });
+    }
+    setShowDropdown(true);
+  }, []);
   const [showWidgetControls, setShowWidgetControls] = useState(false);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
-      if (showDropdown && containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
+      if (showDropdown) {
+        const clickedInsideBtn = dropdownBtnRef.current?.contains(e.target as Node);
+        const clickedInsidePanel = dropdownPanelRef.current?.contains(e.target as Node);
+        if (!clickedInsideBtn && !clickedInsidePanel) {
+          setShowDropdown(false);
+        }
       }
     };
     document.addEventListener('mousedown', handleOutsideClick);
@@ -554,9 +588,14 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
             {/* 3-Dot Actions Menu */}
             <div className="relative flex items-center shrink-0">
               <button
+                ref={dropdownBtnRef}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setShowDropdown(!showDropdown);
+                  if (showDropdown) {
+                    setShowDropdown(false);
+                  } else {
+                    openDropdown();
+                  }
                 }}
                 className="p-1 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
                 title="Widget options"
@@ -564,9 +603,17 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
                 <MoreVertical className="w-4 h-4" />
               </button>
               
-              {showDropdown && (
-                <div className="absolute right-0 top-7 w-48 glass-panel rounded-xl p-1.5 shadow-2xl border border-color-border-color z-50 flex flex-col gap-0.5 text-xs text-secondary-text select-none">
-                  
+              {showDropdown && dropdownPos && createPortal(
+                <div
+                  ref={dropdownPanelRef}
+                  style={{
+                    position: 'fixed',
+                    top: dropdownPos.top,
+                    right: dropdownPos.right,
+                    zIndex: 9999,
+                  }}
+                  className="w-48 glass-panel rounded-xl p-1.5 shadow-2xl border border-color-border-color flex flex-col gap-0.5 text-xs text-secondary-text select-none"
+                >
                   {/* Toggle controls inside the widget */}
                   <button
                     type="button"
@@ -700,7 +747,8 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>Delete Widget</span>
                   </button>
-                </div>
+                </div>,
+                document.body
               )}
             </div>
           </div>
