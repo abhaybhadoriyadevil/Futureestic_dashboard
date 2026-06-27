@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWidgetStore } from '../../stores/useWidgetStore';
-import { Plus, Trash2, Check, X as XIcon, Activity, Flame, Clock } from 'lucide-react';
+import { Plus, Trash2, Check, X as XIcon, Flame, Clock } from 'lucide-react';
 
 export type RepeatType = 'everyday' | 'weekdays' | 'weekends' | 'custom';
 

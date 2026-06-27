@@ -9,7 +9,7 @@ export const CreateWorkspaceModal: React.FC = () => {
   const { createDashboard, setActiveDashboardId } = useDashboardStore();
 
   const [newDashName, setNewDashName] = useState('');
-  const [newDashLayout, setNewDashLayout] = useState<'grid' | 'free' | 'snap' | 'canvas'>('grid');
+  const [newDashLayout, setNewDashLayout] = useState<'free' | 'snap' | 'canvas'>('free');
   const [newDashIcon, setNewDashIcon] = useState('Layout');
 
   const handleCreateDashboard = async (e: React.FormEvent) => {

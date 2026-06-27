@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useDashboardStore } from '../stores/useDashboardStore';
 import { useThemeStore } from '../stores/useThemeStore';
-import { useLayoutStore } from '../stores/useLayoutStore';
 import { useUIStore } from '../stores/useUIStore';
 import { 
   Home, 
@@ -19,7 +18,6 @@ import {
 export const Sidebar: React.FC = () => {
   const { dashboards, activeDashboardId, setActiveDashboardId, deleteDashboard } = useDashboardStore();
   const { theme } = useThemeStore();
-  const { isEditMode } = useLayoutStore();
   const { setCreateWorkspaceModal } = useUIStore();
   
   const [isCollapsed, setIsCollapsed] = useState(false);

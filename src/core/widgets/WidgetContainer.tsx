@@ -32,7 +32,6 @@ import {
   Sliders
 } from 'lucide-react';
 import { useClipboardStore } from '../../stores/useClipboardStore';
-import { useDashboardStore } from '../../stores/useDashboardStore';
 
 // Lazy loaded module components
 const NotesWidget = React.lazy(() => import('../../modules/notes/NotesWidget').then(m => ({ default: m.NotesWidget })));
@@ -96,7 +95,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const { isEditMode, zoom } = useLayoutStore();
   const { selectedWidgetId, setSelectedWidgetId, setFullscreenWidgetId } = useSelectionStore();
   const { copyWidget } = useClipboardStore();
-  const { dashboards } = useDashboardStore();
 
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -144,8 +142,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [showDropdown]);
-
-  const activeDashboard = dashboards.find(d => d.id === widget.dashboardId);
 
   useEffect(() => {
     setTitle(widget.title);
