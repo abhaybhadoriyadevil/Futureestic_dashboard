@@ -107,7 +107,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownBtnRef = useRef<HTMLButtonElement>(null);
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; right: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; right?: number; left?: number } | null>(null);
   
   // Dragging states
   const [isDragging, setIsDragging] = useState(false);
@@ -153,18 +153,21 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
       // Default: align right edge with button right, drop below
       let top = rect.bottom + 4;
-      let right = viewportWidth - rect.right;
+      let right: number | undefined = viewportWidth - rect.right;
+      let left: number | undefined = undefined;
 
       // Flip up if not enough space below
       if (top + dropdownHeight > viewportHeight - 8) {
         top = rect.top - dropdownHeight - 4;
       }
+      
       // Ensure right edge doesn't go off-screen left
-      if (viewportWidth - right + dropdownWidth > viewportWidth) {
-        right = viewportWidth - rect.left - dropdownWidth;
+      if (rect.right - dropdownWidth < 8) {
+        right = undefined;
+        left = Math.max(8, rect.left);
       }
 
-      setDropdownPos({ top, right });
+      setDropdownPos({ top, right, left });
     }
     setShowDropdown(true);
   }, []);
@@ -639,10 +642,11 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
                   style={{
                     position: 'fixed',
                     top: dropdownPos.top,
-                    right: dropdownPos.right,
+                    ...(dropdownPos.right !== undefined ? { right: dropdownPos.right } : {}),
+                    ...(dropdownPos.left !== undefined ? { left: dropdownPos.left } : {}),
                     zIndex: 9999,
                   }}
-                  className="w-48 glass-panel rounded-xl p-1.5 shadow-2xl border border-color-border-color flex flex-col gap-0.5 text-xs text-secondary-text select-none"
+                  className="w-48 glass-panel bg-black/95 backdrop-blur-3xl rounded-xl p-1.5 shadow-[0_0_30px_rgba(0,0,0,0.8)] border border-color-border-color flex flex-col gap-0.5 text-xs text-secondary-text select-none"
                 >
                   {/* Toggle controls inside the widget */}
                   <button
