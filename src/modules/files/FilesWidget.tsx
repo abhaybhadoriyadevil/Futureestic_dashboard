@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../core/storage/db';
 import type { FileData } from '../../types';
@@ -583,7 +584,7 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
       </div>
 
       {/* ── Universal File Preview / Player Modal ── */}
-      {previewFile && (
+      {previewFile && createPortal(
         <div
           className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[60] p-6"
           onClick={e => { if (e.target === e.currentTarget) { setPreviewFile(null); setPreviewContent(null); } }}
@@ -707,7 +708,8 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

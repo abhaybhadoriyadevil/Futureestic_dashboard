@@ -82,21 +82,54 @@ export const DashboardCanvas: React.FC = () => {
     }
   };
 
-  // Snapping calculations during widget dragging
+  // Snapping and boundary calculations during widget dragging
   const handleWidgetDrag = (draggedId: string, currentX: number, currentY: number, widgetW: number, widgetH: number) => {
-    if (!isSnap) return { x: currentX, y: currentY };
-
     let snapX = currentX;
     let snapY = currentY;
+
+    // Viewport boundaries
+    let minX = -Infinity;
+    let maxX = Infinity;
+    let minY = -Infinity;
+    let maxY = Infinity;
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const containerW = rect.width;
+      const containerH = rect.height;
+
+      if (isCanvas) {
+        // Infinite Canvas bounds: keep at least 40px of the widget visible on screen,
+        // and ensure the header (top of the widget) never goes above the top of the viewport.
+        const padding = 40;
+        minX = -panOffset.x / zoom - widgetW + padding;
+        maxX = (-panOffset.x + containerW) / zoom - padding;
+        minY = -panOffset.y / zoom; // Header must remain visible at the top
+        maxY = (-panOffset.y + containerH) / zoom - padding;
+      } else {
+        // Free / Snap layout bounds: keep strictly within container borders
+        minX = 0;
+        maxX = Math.max(0, containerW - widgetW);
+        minY = 0;
+        maxY = Math.max(0, containerH - widgetH);
+      }
+    }
+
+    // Clamp coordinates to space boundaries
+    snapX = Math.max(minX, Math.min(maxX, snapX));
+    snapY = Math.max(minY, Math.min(maxY, snapY));
+
+    if (!isSnap) return { x: snapX, y: snapY };
+
     let guideX: number | null = null;
     let guideY: number | null = null;
 
-    const dragL = currentX;
-    const dragR = currentX + widgetW;
-    const dragT = currentY;
-    const dragB = currentY + widgetH;
-    const dragCX = currentX + widgetW / 2;
-    const dragCY = currentY + widgetH / 2;
+    const dragL = snapX;
+    const dragR = snapX + widgetW;
+    const dragT = snapY;
+    const dragB = snapY + widgetH;
+    const dragCX = snapX + widgetW / 2;
+    const dragCY = snapY + widgetH / 2;
 
     for (const w of widgets) {
       if (w.id === draggedId || !w.visible) continue;
@@ -120,6 +153,10 @@ export const DashboardCanvas: React.FC = () => {
       else if (Math.abs(dragB - wT) < snapTolerance) { snapY = wT - widgetH; guideY = wT; }
       else if (Math.abs(dragCY - wCY) < snapTolerance) { snapY = wCY - widgetH / 2; guideY = wCY; }
     }
+
+    // Re-clamp snapped coordinates to preserve layout borders
+    snapX = Math.max(minX, Math.min(maxX, snapX));
+    snapY = Math.max(minY, Math.min(maxY, snapY));
 
     setSnapGuides({ x: guideX, y: guideY });
     return { x: snapX, y: snapY };

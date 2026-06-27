@@ -5,6 +5,7 @@ import type { Widget } from '../../types';
 import { useWidgetStore } from '../../stores/useWidgetStore';
 import { useLayoutStore } from '../../stores/useLayoutStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
+import { useDashboardStore } from '../../stores/useDashboardStore';
 import { 
   Lock, 
   Unlock, 
@@ -93,9 +94,13 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   onDragEnd
 }) => {
   const { updateWidgetLocal, commitWidgetUpdate, duplicateWidget, deleteWidget, bringToFront, sendToBack } = useWidgetStore();
-  const { isEditMode, zoom } = useLayoutStore();
+  const { isEditMode, zoom, panOffset } = useLayoutStore();
   const { selectedWidgetId, setSelectedWidgetId, setFullscreenWidgetId } = useSelectionStore();
   const { copyWidget } = useClipboardStore();
+  const { dashboards, activeDashboardId } = useDashboardStore();
+
+  const activeDashboard = dashboards.find(d => d.id === activeDashboardId);
+  const isCanvas = activeDashboard?.layoutType === 'canvas';
 
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownBtnRef = useRef<HTMLButtonElement>(null);
@@ -308,8 +313,29 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     const deltaW = (e.clientX - resizeStart.x) / scaleFactor;
     const deltaH = (e.clientY - resizeStart.y) / scaleFactor;
 
-    const targetW = Math.max(150, resizeStart.wW + deltaW);
-    const targetH = Math.max(100, resizeStart.wH + deltaH);
+    let targetW = Math.max(150, resizeStart.wW + deltaW);
+    let targetH = Math.max(100, resizeStart.wH + deltaH);
+
+    // Limit resize to keep widget inside viewport boundaries
+    const viewport = containerRef.current?.closest('.overflow-hidden');
+    if (viewport) {
+      const rect = viewport.getBoundingClientRect();
+      const containerW = rect.width;
+      const containerH = rect.height;
+
+      if (isCanvas) {
+        // Infinite Canvas bounds: don't let it grow beyond the current viewport edges
+        const viewportMaxX = (-panOffset.x + containerW) / zoom;
+        const viewportMaxY = (-panOffset.y + containerH) / zoom;
+        
+        targetW = Math.min(targetW, Math.max(150, viewportMaxX - widget.position.x));
+        targetH = Math.min(targetH, Math.max(100, viewportMaxY - widget.position.y));
+      } else {
+        // Free / Snap layout bounds: keep strictly within container borders
+        targetW = Math.min(targetW, Math.max(150, containerW - widget.position.x));
+        targetH = Math.min(targetH, Math.max(100, containerH - widget.position.y));
+      }
+    }
 
     updateWidgetLocal(widget.id, {
       size: { w: targetW, h: targetH }
