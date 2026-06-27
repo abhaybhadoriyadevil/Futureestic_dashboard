@@ -35,15 +35,6 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
 
   const audioRef = useRef<HTMLAudioElement>(null);
 
-  useEffect(() => {
-    if (activeAudio) {
-      const url = URL.createObjectURL(activeAudio.blob);
-      setBlobUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setBlobUrl('');
-  }, [activeAudio]);
-
   // Sync fileIds from dataRef
   useEffect(() => {
     if (dataRef) {
@@ -70,6 +61,15 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
   }, [fileIds]) || [];
 
   const activeAudio = audios.find(v => v.id === activeAudioId);
+
+  useEffect(() => {
+    if (activeAudio) {
+      const url = URL.createObjectURL(activeAudio.blob);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setBlobUrl('');
+  }, [activeAudio]);
 
   useEffect(() => {
     if (audios.length > 0 && !activeAudioId) {

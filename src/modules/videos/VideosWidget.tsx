@@ -36,15 +36,6 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    if (activeVideo) {
-      const url = URL.createObjectURL(activeVideo.blob);
-      setBlobUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setBlobUrl('');
-  }, [activeVideo]);
-
   // Sync fileIds from dataRef
   useEffect(() => {
     if (dataRef) {
@@ -71,6 +62,15 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
   }, [fileIds]) || [];
 
   const activeVideo = videos.find(v => v.id === activeVideoId);
+
+  useEffect(() => {
+    if (activeVideo) {
+      const url = URL.createObjectURL(activeVideo.blob);
+      setBlobUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setBlobUrl('');
+  }, [activeVideo]);
 
   useEffect(() => {
     if (videos.length > 0 && !activeVideoId) {
