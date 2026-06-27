@@ -9,7 +9,7 @@ export interface Dashboard {
   updatedAt: number;
 }
 
-export type WidgetModuleType = 'files' | 'images' | 'videos' | 'notes' | 'tables' | 'calendar' | 'charts' | 'statistics' | 'kanban' | 'mindmap' | 'habits';
+export type WidgetModuleType = 'files' | 'images' | 'videos' | 'audio' | 'notes' | 'tables' | 'calendar' | 'charts' | 'statistics' | 'kanban' | 'mindmap' | 'habits';
 
 export interface Widget {
   id: string;

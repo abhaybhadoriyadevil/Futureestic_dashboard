@@ -27,7 +27,9 @@ import {
   GitBranch,
   X,
   ClipboardPaste,
-  Target
+  Target,
+  Film,
+  Music
 } from 'lucide-react';
 
 export const TopNavbar: React.FC = () => {
@@ -53,6 +55,7 @@ export const TopNavbar: React.FC = () => {
       files: { w: 450, h: 320 },
       images: { w: 400, h: 300 },
       videos: { w: 480, h: 360 },
+      audio: { w: 380, h: 360 },
       tables: { w: 600, h: 400 },
       calendar: { w: 600, h: 400 },
       charts: { w: 600, h: 320 },
@@ -210,6 +213,8 @@ export const TopNavbar: React.FC = () => {
     { type: 'mindmap', label: 'Mind Map Node', icon: <GitBranch className="w-4 h-4 text-cyan-accent" /> },
     { type: 'files', label: 'Local Files', icon: <FolderOpen className="w-4 h-4 text-green-accent" /> },
     { type: 'images', label: 'Image Gallery', icon: <Image className="w-4 h-4 text-blue-accent" /> },
+    { type: 'videos', label: 'Video Player', icon: <Film className="w-4 h-4 text-purple-accent" /> },
+    { type: 'audio', label: 'Audio / Music', icon: <Music className="w-4 h-4 text-pink-500" /> },
     { type: 'habits', label: 'Habit Tracker', icon: <Target className="w-4 h-4 text-orange-500" /> },
   ];
 

@@ -30,6 +30,7 @@ import {
   FolderOpen,
   Image,
   Video,
+  Music,
   MoreVertical,
   Sliders
 } from 'lucide-react';
@@ -40,6 +41,7 @@ const NotesWidget = React.lazy(() => import('../../modules/notes/NotesWidget').t
 const FilesWidget = React.lazy(() => import('../../modules/files/FilesWidget').then(m => ({ default: m.FilesWidget })));
 const ImagesWidget = React.lazy(() => import('../../modules/images/ImagesWidget').then(m => ({ default: m.ImagesWidget })));
 const VideosWidget = React.lazy(() => import('../../modules/videos/VideosWidget').then(m => ({ default: m.VideosWidget })));
+const AudioWidget = React.lazy(() => import('../../modules/audio/AudioWidget').then(m => ({ default: m.AudioWidget })));
 const TablesWidget = React.lazy(() => import('../../modules/tables/TablesWidget').then(m => ({ default: m.TablesWidget })));
 const CalendarWidget = React.lazy(() => import('../../modules/calendar/CalendarWidget').then(m => ({ default: m.CalendarWidget })));
 const StatisticsWidget = React.lazy(() => import('../../modules/statistics/StatisticsWidget').then(m => ({ default: m.StatisticsWidget })));
@@ -203,6 +205,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       case 'files': return <FolderOpen className="w-3.5 h-3.5 text-green-accent" />;
       case 'images': return <Image className="w-3.5 h-3.5 text-blue-accent" />;
       case 'videos': return <Video className="w-3.5 h-3.5 text-purple-accent" />;
+      case 'audio': return <Music className="w-3.5 h-3.5 text-cyan-accent" />;
       default: return <FileText className="w-3.5 h-3.5 text-muted-text" />;
     }
   };
@@ -398,6 +401,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
             case 'files': return <FilesWidget {...props} />;
             case 'images': return <ImagesWidget {...props} />;
             case 'videos': return <VideosWidget {...props} />;
+            case 'audio': return <AudioWidget {...props} />;
             case 'tables': return <TablesWidget {...props} />;
             case 'calendar': return <CalendarWidget {...props} />;
             case 'statistics': return <StatisticsWidget {...props} />;
