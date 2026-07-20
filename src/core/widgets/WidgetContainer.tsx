@@ -140,7 +140,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     if (dropdownBtnRef.current) {
       const rect = dropdownBtnRef.current.getBoundingClientRect();
       const dropdownWidth = 192; // w-48 = 12rem = 192px
-      const dropdownHeight = 330; // approx menu height
+      const dropdownHeight = 220; // actual approx menu height (6 items)
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
