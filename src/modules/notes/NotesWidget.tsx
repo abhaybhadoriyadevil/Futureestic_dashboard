@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../core/storage/db';
 import { FileText, Save, Edit3, Folder, Plus, Search, Tag } from 'lucide-react';
+import { useWidgetStore } from '../../stores/useWidgetStore';
 
 interface NotesWidgetProps {
   widgetId: string;
@@ -10,7 +11,8 @@ interface NotesWidgetProps {
   showControls?: boolean;
 }
 
-export const NotesWidget: React.FC<NotesWidgetProps> = ({ dataRef, showControls = false }) => {
+export const NotesWidget: React.FC<NotesWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
+  const { commitWidgetUpdate } = useWidgetStore();
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(dataRef || null);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
@@ -138,6 +140,7 @@ export const NotesWidget: React.FC<NotesWidgetProps> = ({ dataRef, showControls 
     setNewNoteTitle('');
     setSelectedNoteId(id);
     setIsEditing(true);
+    await commitWidgetUpdate(widgetId, { dataRef: id });
   };
 
   // Get folders and tags for lists
@@ -311,7 +314,10 @@ export const NotesWidget: React.FC<NotesWidgetProps> = ({ dataRef, showControls 
             {/* Header */}
             <div className="flex items-center justify-between border-b border-color-border-color pb-2 mb-3">
               <button 
-                onClick={() => setSelectedNoteId(null)}
+                onClick={async () => {
+                  setSelectedNoteId(null);
+                  await commitWidgetUpdate(widgetId, { dataRef: "" });
+                }}
                 className="text-muted-text hover:text-primary-text flex items-center gap-1 cursor-pointer"
               >
                 <span>&larr; Back</span>
@@ -392,7 +398,10 @@ export const NotesWidget: React.FC<NotesWidgetProps> = ({ dataRef, showControls 
                 filteredNotes.map(n => (
                   <button
                     key={n.id}
-                    onClick={() => setSelectedNoteId(n.id)}
+                    onClick={async () => {
+                      setSelectedNoteId(n.id);
+                      await commitWidgetUpdate(widgetId, { dataRef: n.id });
+                    }}
                     className="w-full text-left p-3 rounded-xl border border-color-border-color bg-glass-bg/40 hover:bg-glass-bg transition-colors flex justify-between items-start gap-4 cursor-pointer"
                   >
                     <div>

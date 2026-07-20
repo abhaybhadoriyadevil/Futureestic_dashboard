@@ -17,7 +17,7 @@ export const useLayoutStore = create<LayoutState>((set) => ({
   panOffset: { x: 0, y: 0 },
   snapTolerance: 12,
   gridCellSize: 40, // 40px grid cell. 12 columns, 24px gap.
-  isEditMode: false,
+  isEditMode: true,
 
   setZoom: (zoom) => {
     set((state) => {

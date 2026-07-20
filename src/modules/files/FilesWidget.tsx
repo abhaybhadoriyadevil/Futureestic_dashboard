@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../core/storage/db';
 import type { FileData } from '../../types';
@@ -321,13 +320,11 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
   const { commitWidgetUpdate } = useWidgetStore();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<FileCategory | null>(null);
-  const [previewFile, setPreviewFile] = useState<FileData | null>(null);
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [fileIds, setFileIds] = useState<string[]>([]);
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
 
-  // ── Sync fileIds from per-widget dataRef ──────────────────────
-  // Each widget instance stores its own list of file IDs in dataRef.
-  // This ensures full data isolation between multiple FilesWidgets.
+  // ── Sync fileIds and previewFileId from per-widget dataRef ──────────────────────
   useEffect(() => {
     if (dataRef) {
       try {
@@ -337,11 +334,18 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
         } else {
           setFileIds([]);
         }
+        if (parsed.previewFileId) {
+          setPreviewFileId(parsed.previewFileId);
+        } else {
+          setPreviewFileId(null);
+        }
       } catch {
         setFileIds([]);
+        setPreviewFileId(null);
       }
     } else {
       setFileIds([]);
+      setPreviewFileId(null);
     }
   }, [dataRef]);
 
@@ -352,6 +356,24 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
     return list.filter((f): f is FileData => !!f);
   }, [fileIds]) || [];
 
+  const previewFile = files.find(f => f.id === previewFileId) || null;
+
+  useEffect(() => {
+    const loadPreviewContent = async () => {
+      if (previewFile && isTextFile(previewFile)) {
+        try {
+          const text = await previewFile.blob.text();
+          setPreviewContent(text.substring(0, 10000));
+        } catch {
+          setPreviewContent('Unable to read file contents.');
+        }
+      } else {
+        setPreviewContent(null);
+      }
+    };
+    loadPreviewContent();
+  }, [previewFile]);
+
   const sortedFiles = [...files].sort((a, b) => b.createdAt - a.createdAt);
 
   const categories: FileCategory[] = ['Documents', 'Images', 'Videos', 'Audio', 'Spreadsheets', 'Archives', 'Others'];
@@ -359,7 +381,6 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files ?? []);
     if (selected.length === 0) return;
-    // Reset input so same file can be re-uploaded
     e.target.value = '';
 
     const newIds: string[] = [];
@@ -387,7 +408,7 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
     if (newIds.length > 0) {
       const updatedIds = [...fileIds, ...newIds];
       await commitWidgetUpdate(widgetId, {
-        dataRef: JSON.stringify({ fileIds: updatedIds }),
+        dataRef: JSON.stringify({ fileIds: updatedIds, previewFileId: previewFileId || undefined }),
       });
     }
   };
@@ -407,24 +428,25 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
     if (!confirm('Permanently delete this file from local storage?')) return;
     await db.files.delete(id);
     const newIds = fileIds.filter(fid => fid !== id);
-    await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds: newIds }) });
-    if (previewFile?.id === id) {
-      setPreviewFile(null);
-      setPreviewContent(null);
-    }
+    const keepPreview = previewFileId && previewFileId !== id;
+    await commitWidgetUpdate(widgetId, {
+      dataRef: JSON.stringify({
+        fileIds: newIds,
+        previewFileId: keepPreview ? previewFileId : undefined
+      })
+    });
   };
 
   const handlePreview = async (file: FileData) => {
-    setPreviewFile(file);
-    setPreviewContent(null);
-    if (isTextFile(file)) {
-      try {
-        const text = await file.blob.text();
-        setPreviewContent(text.substring(0, 10000));
-      } catch {
-        setPreviewContent('Unable to read file contents.');
-      }
-    }
+    await commitWidgetUpdate(widgetId, {
+      dataRef: JSON.stringify({ fileIds, previewFileId: file.id }),
+    });
+  };
+
+  const closePreview = async () => {
+    await commitWidgetUpdate(widgetId, {
+      dataRef: JSON.stringify({ fileIds }),
+    });
   };
 
   const filteredFiles = sortedFiles.filter(f => {
@@ -452,266 +474,268 @@ export const FilesWidget: React.FC<FilesWidgetProps> = ({ widgetId, dataRef, sho
 
   // Navigate preview (next / prev)
   const previewIndex = previewFile ? filteredFiles.findIndex(f => f.id === previewFile.id) : -1;
-  const goPrev = () => {
-    if (previewIndex > 0) handlePreview(filteredFiles[previewIndex - 1]);
+  
+  const goPrev = async () => {
+    if (previewIndex > 0) {
+      await commitWidgetUpdate(widgetId, {
+        dataRef: JSON.stringify({ fileIds, previewFileId: filteredFiles[previewIndex - 1].id }),
+      });
+    }
   };
-  const goNext = () => {
-    if (previewIndex < filteredFiles.length - 1) handlePreview(filteredFiles[previewIndex + 1]);
+
+  const goNext = async () => {
+    if (previewIndex < filteredFiles.length - 1) {
+      await commitWidgetUpdate(widgetId, {
+        dataRef: JSON.stringify({ fileIds, previewFileId: filteredFiles[previewIndex + 1].id }),
+      });
+    }
   };
 
   return (
     <div className="w-full h-full flex flex-col p-4 text-xs text-primary-text bg-transparent overflow-hidden">
-
-      {/* ── Search + Upload Bar ── */}
-      <div className="flex gap-2 mb-3">
-        <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-xl border border-color-border-color bg-glass-bg/40 focus-within:border-cyan-accent transition-colors">
-          <Search className="w-3.5 h-3.5 text-muted-text shrink-0" />
-          <input
-            type="text"
-            placeholder="Search files…"
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent text-xs focus:outline-none text-primary-text placeholder:text-muted-text"
-          />
-        </div>
-        {showControls && (
-          <label className="px-3 py-1.5 rounded-xl bg-cyan-accent text-black font-bold flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity shrink-0">
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload</span>
-            <input
-              type="file"
-              multiple
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
-        )}
-      </div>
-
-      {/* ── Category Filter + Size ── */}
-      {showControls && (
-        <div className="flex items-center justify-between mb-3 gap-2">
-          <div className="flex flex-wrap gap-1 flex-1 overflow-hidden">
-            <button
-              onClick={() => setSelectedCategory(null)}
-              className={`px-2 py-0.5 rounded-lg border text-[9px] cursor-pointer transition-colors ${
-                selectedCategory === null
-                  ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent'
-                  : 'border-color-border-color text-muted-text hover:text-secondary-text'
-              }`}
-            >
-              All
-            </button>
-            {categories.map(c => (
-              <button
-                key={c}
-                onClick={() => setSelectedCategory(c)}
-                className={`px-2 py-0.5 rounded-lg border text-[9px] cursor-pointer transition-colors ${
-                  selectedCategory === c
-                    ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent'
-                    : 'border-color-border-color text-muted-text hover:text-secondary-text'
-                }`}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-          <span className="text-[9px] text-muted-text font-semibold whitespace-nowrap shrink-0">
-            {formatSize(totalSize)}
-          </span>
-        </div>
-      )}
-
-      {/* ── File List ── */}
-      <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5" style={{ scrollbarWidth: 'none' }}>
-        {filteredFiles.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-text">
-            <File className="w-10 h-10 opacity-30" />
-            <p className="italic text-center leading-relaxed">
-              No files yet. Click <strong className="text-secondary-text">Upload</strong> (via controls) to add any file.
-            </p>
-          </div>
-        ) : (
-          filteredFiles.map(f => (
-            <div
-              key={f.id}
-              className="flex items-center justify-between p-2.5 rounded-xl border border-color-border-color bg-glass-bg/30 hover:bg-glass-bg/70 transition-colors group/file"
-            >
-              <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                {getFileIcon(f)}
-                <div className="flex flex-col min-w-0">
-                  <span className="font-semibold text-primary-text truncate" title={f.name}>
-                    {f.name}
-                  </span>
-                  <span className="text-[9px] text-muted-text">
-                    {formatSize(f.size)} · {f.category}
-                    {isVideoFile(f) && ' · Video'}
-                    {isAudioFile(f) && ' · Audio'}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 shrink-0 ml-2">
-                <button
-                  onClick={() => handlePreview(f)}
-                  className={`p-1.5 rounded-lg text-secondary-text cursor-pointer transition-colors ${
-                    isPreviewable(f)
-                      ? 'hover:bg-glass-bg hover:text-cyan-accent'
-                      : 'hover:bg-glass-bg hover:text-muted-text'
-                  }`}
-                  title={isPreviewable(f) ? 'Open / Play' : 'View file info'}
-                >
-                  <Eye className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  onClick={() => handleDownload(f)}
-                  className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors"
-                  title="Download"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                </button>
-                {showControls && (
-                  <button
-                    onClick={() => handleDelete(f.id)}
-                    className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-red-500 cursor-pointer transition-colors opacity-0 group-hover/file:opacity-100"
-                    title="Delete"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
+      {previewFile ? (
+        // Inline File Preview
+        <div className="w-full h-full flex flex-col overflow-hidden border border-color-border-color rounded-xl bg-glass-bg/25">
+          {/* Header */}
+          <div className="flex items-center justify-between px-3 py-2 border-b border-color-border-color bg-glass-bg/30 shrink-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              {getFileIcon(previewFile, 'w-4 h-4 shrink-0')}
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-[11px] text-primary-text truncate" title={previewFile.name}>{previewFile.name}</p>
+                <p className="text-[9px] text-muted-text">{previewFile.category} · {formatSize(previewFile.size)}</p>
               </div>
             </div>
-          ))
-        )}
-      </div>
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              {filteredFiles.length > 1 && (
+                <>
+                  <button
+                    onClick={goPrev}
+                    disabled={previewIndex <= 0}
+                    className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer disabled:opacity-30 transition-colors"
+                    title="Previous file"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                  <span className="text-[9px] text-muted-text font-mono">{previewIndex + 1}/{filteredFiles.length}</span>
+                  <button
+                    onClick={goNext}
+                    disabled={previewIndex >= filteredFiles.length - 1}
+                    className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer disabled:opacity-30 transition-colors"
+                    title="Next file"
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => handleDownload(previewFile)}
+                className="p-1 rounded hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors"
+                title="Download"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={closePreview}
+                className="p-1 rounded hover:bg-glass-bg text-muted-text hover:text-primary-text cursor-pointer transition-colors"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
-      {/* ── Universal File Preview / Player Modal ── */}
-      {previewFile && createPortal(
-        <div
-          className="fixed inset-0 bg-black/75 backdrop-blur-md flex items-center justify-center z-[60] p-6"
-          onClick={e => { if (e.target === e.currentTarget) { setPreviewFile(null); setPreviewContent(null); } }}
-        >
-          <div className="w-full max-w-3xl h-[85vh] glass-panel rounded-2xl flex flex-col overflow-hidden border border-color-border-color shadow-2xl animate-[fadeIn_0.2s_ease-out]">
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-color-border-color bg-glass-bg/30 shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                {getFileIcon(previewFile, 'w-4 h-4')}
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-primary-text truncate">{previewFile.name}</p>
-                  <p className="text-[10px] text-muted-text">{previewFile.category} · {formatSize(previewFile.size)}</p>
-                </div>
+          {/* Content area */}
+          <div className="flex-1 overflow-hidden relative bg-black/10">
+            {/* 🎬 Video player */}
+            {isVideoFile(previewFile) && (
+              <div className="w-full h-full p-2">
+                <VideoPreview file={previewFile} />
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {/* Prev / Next navigation */}
-                {filteredFiles.length > 1 && (
-                  <>
-                    <button
-                      onClick={goPrev}
-                      disabled={previewIndex <= 0}
-                      className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer disabled:opacity-30 transition-colors"
-                      title="Previous file"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-[10px] text-muted-text font-mono">{previewIndex + 1}/{filteredFiles.length}</span>
-                    <button
-                      onClick={goNext}
-                      disabled={previewIndex >= filteredFiles.length - 1}
-                      className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer disabled:opacity-30 transition-colors"
-                      title="Next file"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </>
-                )}
+            )}
+
+            {/* 🎵 Audio player */}
+            {!isVideoFile(previewFile) && isAudioFile(previewFile) && (
+              <div className="w-full h-full">
+                <AudioPreview file={previewFile} />
+              </div>
+            )}
+
+            {/* 🖼️ Image viewer */}
+            {isImageFile(previewFile) && (
+              <div className="w-full h-full flex items-center justify-center p-2">
+                <img
+                  src={URL.createObjectURL(previewFile.blob)}
+                  alt={previewFile.name}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
+            )}
+
+            {/* 📄 PDF viewer */}
+            {isPdfFile(previewFile) && !isVideoFile(previewFile) && !isAudioFile(previewFile) && !isImageFile(previewFile) && (
+              <iframe
+                src={URL.createObjectURL(previewFile.blob)}
+                title={previewFile.name}
+                className="w-full h-full border-0"
+              />
+            )}
+
+            {/* 📝 Text / code viewer */}
+            {isTextFile(previewFile) && !isVideoFile(previewFile) && !isAudioFile(previewFile) && !isImageFile(previewFile) && !isPdfFile(previewFile) && (
+              <pre className="w-full h-full text-[10px] text-secondary-text font-mono p-3 overflow-auto leading-relaxed whitespace-pre-wrap break-words">
+                {previewContent ?? 'Loading…'}
+              </pre>
+            )}
+
+            {/* 📦 Unpreviewable file */}
+            {!isPreviewable(previewFile) && (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-4 text-center">
+                <div className="w-12 h-12 rounded-xl border border-color-border-color bg-glass-bg/40 flex items-center justify-center">
+                  {getFileIcon(previewFile, 'w-6 h-6')}
+                </div>
+                <div>
+                  <p className="font-bold text-xs text-primary-text mb-0.5">{previewFile.name}</p>
+                  <p className="text-[10px] text-muted-text">{previewFile.category} · {formatSize(previewFile.size)}</p>
+                  <p className="text-[9px] text-muted-text mt-1 opacity-70">
+                    No preview available.
+                  </p>
+                </div>
                 <button
                   onClick={() => handleDownload(previewFile)}
-                  className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors"
-                  title="Download"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-accent text-black font-bold text-[10px] hover:opacity-90 transition-opacity cursor-pointer"
                 >
-                  <Download className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => { setPreviewFile(null); setPreviewContent(null); }}
-                  className="p-1.5 rounded-xl hover:bg-glass-bg text-muted-text hover:text-primary-text cursor-pointer transition-colors"
-                  title="Close"
-                >
-                  <X className="w-5 h-5" />
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download</span>
                 </button>
               </div>
-            </div>
-
-            {/* Content area */}
-            <div className="flex-1 overflow-hidden relative">
-
-              {/* 🎬 Video player */}
-              {isVideoFile(previewFile) && (
-                <div className="w-full h-full p-4">
-                  <VideoPreview file={previewFile} />
-                </div>
-              )}
-
-              {/* 🎵 Audio player */}
-              {!isVideoFile(previewFile) && isAudioFile(previewFile) && (
-                <div className="w-full h-full">
-                  <AudioPreview file={previewFile} />
-                </div>
-              )}
-
-              {/* 🖼️ Image viewer */}
-              {isImageFile(previewFile) && (
-                <div className="w-full h-full flex items-center justify-center p-4 bg-black/30">
-                  <img
-                    src={URL.createObjectURL(previewFile.blob)}
-                    alt={previewFile.name}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
-                  />
-                </div>
-              )}
-
-              {/* 📄 PDF viewer */}
-              {isPdfFile(previewFile) && !isVideoFile(previewFile) && !isAudioFile(previewFile) && !isImageFile(previewFile) && (
-                <iframe
-                  src={URL.createObjectURL(previewFile.blob)}
-                  title={previewFile.name}
-                  className="w-full h-full"
-                />
-              )}
-
-              {/* 📝 Text / code viewer */}
-              {isTextFile(previewFile) && !isVideoFile(previewFile) && !isAudioFile(previewFile) && !isImageFile(previewFile) && !isPdfFile(previewFile) && (
-                <pre className="w-full h-full text-[11px] text-secondary-text font-mono p-5 overflow-auto leading-relaxed whitespace-pre-wrap break-words">
-                  {previewContent ?? 'Loading…'}
-                </pre>
-              )}
-
-              {/* 📦 Unpreviewable file — info + download card */}
-              {!isPreviewable(previewFile) && (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-5 p-8 text-center">
-                  <div className="w-20 h-20 rounded-2xl border border-color-border-color bg-glass-bg/40 flex items-center justify-center">
-                    {getFileIcon(previewFile, 'w-10 h-10')}
-                  </div>
-                  <div>
-                    <p className="font-bold text-base text-primary-text mb-1">{previewFile.name}</p>
-                    <p className="text-sm text-muted-text">{previewFile.category} · {formatSize(previewFile.size)}</p>
-                    <p className="text-[11px] text-muted-text mt-2 opacity-70">
-                      This file type cannot be previewed in the browser.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => handleDownload(previewFile)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-cyan-accent text-black font-bold text-sm hover:opacity-90 transition-opacity cursor-pointer"
-                  >
-                    <Download className="w-4 h-4" />
-                    Download to Open
-                  </button>
-                </div>
-              )}
-            </div>
+            )}
           </div>
-        </div>,
-        document.body
+        </div>
+      ) : (
+        <>
+          {/* ── Search + Upload Bar ── */}
+          <div className="flex gap-2 mb-3">
+            <div className="flex-1 flex items-center gap-2 px-3 py-1.5 rounded-xl border border-color-border-color bg-glass-bg/40 focus-within:border-cyan-accent transition-colors">
+              <Search className="w-3.5 h-3.5 text-muted-text shrink-0" />
+              <input
+                type="text"
+                placeholder="Search files…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-xs focus:outline-none text-primary-text placeholder:text-muted-text"
+              />
+            </div>
+            {showControls && (
+              <label className="px-3 py-1.5 rounded-xl bg-cyan-accent text-black font-bold flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity shrink-0 text-[10px]">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload</span>
+                <input
+                  type="file"
+                  multiple
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+
+          {/* ── Category Filter + Size ── */}
+          {showControls && (
+            <div className="flex items-center justify-between mb-3 gap-2">
+              <div className="flex flex-wrap gap-1 flex-1 overflow-hidden">
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className={`px-2 py-0.5 rounded-lg border text-[9px] cursor-pointer transition-colors ${
+                    selectedCategory === null
+                      ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent'
+                      : 'border-color-border-color text-muted-text hover:text-secondary-text'
+                  }`}
+                >
+                  All
+                </button>
+                {categories.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => setSelectedCategory(c)}
+                    className={`px-2 py-0.5 rounded-lg border text-[9px] cursor-pointer transition-colors ${
+                      selectedCategory === c
+                        ? 'border-cyan-accent bg-cyan-accent/5 text-cyan-accent'
+                        : 'border-color-border-color text-muted-text hover:text-secondary-text'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <span className="text-[9px] text-muted-text font-semibold whitespace-nowrap shrink-0">
+                {formatSize(totalSize)}
+              </span>
+            </div>
+          )}
+
+          {/* ── File List ── */}
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5" style={{ scrollbarWidth: 'none' }}>
+            {filteredFiles.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-text">
+                <File className="w-10 h-10 opacity-30" />
+                <p className="italic text-center leading-relaxed">
+                  No files yet. Click <strong className="text-secondary-text">Upload</strong> (via controls) to add any file.
+                </p>
+              </div>
+            ) : (
+              filteredFiles.map(f => (
+                <div
+                  key={f.id}
+                  className="flex items-center justify-between p-2.5 rounded-xl border border-color-border-color bg-glass-bg/30 hover:bg-glass-bg/70 transition-colors group/file"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    {getFileIcon(f)}
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-semibold text-primary-text truncate" title={f.name}>
+                        {f.name}
+                      </span>
+                      <span className="text-[9px] text-muted-text">
+                        {formatSize(f.size)} · {f.category}
+                        {isVideoFile(f) && ' · Video'}
+                        {isAudioFile(f) && ' · Audio'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <button
+                      onClick={() => handlePreview(f)}
+                      className={`p-1.5 rounded-lg text-secondary-text cursor-pointer transition-colors ${
+                        isPreviewable(f)
+                          ? 'hover:bg-glass-bg hover:text-cyan-accent'
+                          : 'hover:bg-glass-bg hover:text-muted-text'
+                      }`}
+                      title={isPreviewable(f) ? 'Open / Play' : 'View file info'}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => handleDownload(f)}
+                      className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors"
+                      title="Download"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                    {showControls && (
+                      <button
+                        onClick={() => handleDelete(f.id)}
+                        className="p-1.5 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-red-500 cursor-pointer transition-colors opacity-0 group-hover/file:opacity-100"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
       )}
     </div>
   );

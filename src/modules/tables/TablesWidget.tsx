@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../core/storage/db';
 import type { TableData } from '../../types';
+import { useWidgetStore } from '../../stores/useWidgetStore';
 import { 
   Table as TableIcon, 
   Plus, 
@@ -25,7 +26,8 @@ interface TablesWidgetProps {
   showControls?: boolean;
 }
 
-export const TablesWidget: React.FC<TablesWidgetProps> = ({ dataRef, showControls = false }) => {
+export const TablesWidget: React.FC<TablesWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
+  const { commitWidgetUpdate } = useWidgetStore();
   const [selectedTableId, setSelectedTableId] = useState<string | null>(dataRef || null);
   
   // Table state
@@ -81,6 +83,7 @@ export const TablesWidget: React.FC<TablesWidgetProps> = ({ dataRef, showControl
     await db.customTables.add(newTable);
     setNewTableName('');
     setSelectedTableId(id);
+    await commitWidgetUpdate(widgetId, { dataRef: id });
   };
 
   const handleAddColumnField = () => {
@@ -251,7 +254,10 @@ export const TablesWidget: React.FC<TablesWidgetProps> = ({ dataRef, showControl
             tables.map((t: TableData) => (
               <button
                 key={t.id}
-                onClick={() => setSelectedTableId(t.id)}
+                onClick={async () => {
+                  setSelectedTableId(t.id);
+                  await commitWidgetUpdate(widgetId, { dataRef: t.id });
+                }}
                 className="w-full text-left p-3 rounded-xl border border-color-border-color bg-glass-bg/40 hover:bg-glass-bg transition-colors flex justify-between items-center cursor-pointer"
               >
                 <div>
@@ -364,7 +370,10 @@ export const TablesWidget: React.FC<TablesWidgetProps> = ({ dataRef, showControl
           {/* Back button only if we are in selector mode */}
           {!dataRef && (
             <button
-              onClick={() => setSelectedTableId(null)}
+              onClick={async () => {
+                setSelectedTableId(null);
+                await commitWidgetUpdate(widgetId, { dataRef: '' });
+              }}
               className="text-muted-text hover:text-primary-text cursor-pointer mr-1.5"
             >
               &larr; Back

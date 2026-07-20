@@ -17,7 +17,6 @@ export const DashboardCanvas: React.FC = () => {
     panOffset, 
     setZoom, 
     setPanOffset, 
-    isEditMode, 
     snapTolerance
   } = useLayoutStore();
 
@@ -191,7 +190,7 @@ export const DashboardCanvas: React.FC = () => {
 
       {/* Snap Guides Visual Overlay */}
       <AnimatePresence>
-        {isSnap && isEditMode && snapGuides.x !== null && (
+        {isSnap && snapGuides.x !== null && (
           <motion.div 
             key="snap-x"
             className="absolute top-0 bottom-0 w-[1px] bg-cyan-accent border-l border-dashed border-cyan-accent/60 shadow-[0_0_8px_rgba(6,182,212,0.6)] z-40 pointer-events-none"
@@ -202,7 +201,7 @@ export const DashboardCanvas: React.FC = () => {
             transition={{ duration: 0.1 }}
           />
         )}
-        {isSnap && isEditMode && snapGuides.y !== null && (
+        {isSnap && snapGuides.y !== null && (
           <motion.div 
             key="snap-y"
             className="absolute left-0 right-0 h-[1px] bg-cyan-accent border-t border-dashed border-cyan-accent/60 shadow-[0_0_8px_rgba(6,182,212,0.6)] z-40 pointer-events-none"
@@ -273,21 +272,6 @@ export const DashboardCanvas: React.FC = () => {
         )}
       </AnimatePresence>
 
-      {/* Edit Mode HUD Overlay indicator */}
-      <AnimatePresence>
-        {isEditMode && (
-          <motion.div
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-2xl glass-panel border border-purple-accent/30 text-xs font-semibold text-purple-accent shadow-[0_0_15px_rgba(139,92,246,0.15)] flex items-center gap-2 pointer-events-none edit-mode-badge"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.2 }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-purple-accent animate-ping" />
-            <span>OS Customization Mode — Drag &amp; Resize unlocked</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

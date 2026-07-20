@@ -43,6 +43,7 @@ export const useWidgetStore = create<WidgetState>((set, get) => ({
             size: updates.size ? { ...w.size, ...updates.size } : w.size,
             styles: updates.styles ? { ...w.styles, ...updates.styles } : w.styles,
             animation: updates.animation ? { ...w.animation, ...updates.animation } : w.animation,
+            uiState: updates.uiState ? { ...w.uiState, ...updates.uiState } : w.uiState,
           };
         }
         return w;
@@ -66,6 +67,7 @@ export const useWidgetStore = create<WidgetState>((set, get) => ({
       size: updates.size ? { ...widget.size, ...updates.size } : widget.size,
       styles: updates.styles ? { ...widget.styles, ...updates.styles } : widget.styles,
       animation: updates.animation ? { ...widget.animation, ...updates.animation } : widget.animation,
+      uiState: updates.uiState ? { ...widget.uiState, ...updates.uiState } : widget.uiState,
     };
 
     // Update locally

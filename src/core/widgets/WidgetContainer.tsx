@@ -7,17 +7,12 @@ import { useLayoutStore } from '../../stores/useLayoutStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { useDashboardStore } from '../../stores/useDashboardStore';
 import { 
-  Lock, 
-  Unlock, 
   Maximize2, 
   Minimize2, 
   Settings, 
   Copy, 
   Clipboard,
   Trash2, 
-  Layers, 
-  EyeOff,
-  Move,
   RulerIcon,
   Minus,
   FileText,
@@ -95,8 +90,8 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   onDrag,
   onDragEnd
 }) => {
-  const { updateWidgetLocal, commitWidgetUpdate, duplicateWidget, deleteWidget, bringToFront, sendToBack } = useWidgetStore();
-  const { isEditMode, zoom, panOffset } = useLayoutStore();
+  const { updateWidgetLocal, commitWidgetUpdate, duplicateWidget, deleteWidget } = useWidgetStore();
+  const { isEditMode, zoom } = useLayoutStore();
   const { selectedWidgetId, setSelectedWidgetId, setFullscreenWidgetId } = useSelectionStore();
   const { copyWidget } = useClipboardStore();
   const { dashboards, activeDashboardId } = useDashboardStore();
@@ -111,6 +106,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   
   // Dragging states
   const [isDragging, setIsDragging] = useState(false);
+  const [dragPending, setDragPending] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, wX: 0, wY: 0 });
 
   // Resizing states
@@ -138,9 +134,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [widthInput, setWidthInput] = useState(Math.round(widget.size.w));
   const [heightInput, setHeightInput] = useState(Math.round(widget.size.h));
 
-  const [isEditingTitleInline, setIsEditingTitleInline] = useState(false);
-  const [inlineTitleValue, setInlineTitleValue] = useState(widget.title);
-  
   const [showDropdown, setShowDropdown] = useState(false);
 
   const openDropdown = useCallback(() => {
@@ -160,6 +153,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       if (top + dropdownHeight > viewportHeight - 8) {
         top = rect.top - dropdownHeight - 4;
       }
+
+      // Clamp so it never goes off-screen top
+      top = Math.max(8, top);
       
       // Ensure right edge doesn't go off-screen left
       if (rect.right - dropdownWidth < 8) {
@@ -171,7 +167,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     }
     setShowDropdown(true);
   }, []);
-  const [showWidgetControls, setShowWidgetControls] = useState(false);
+  const [showWidgetControls, setShowWidgetControls] = useState(widget.uiState?.showControls ?? true);
 
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
@@ -189,7 +185,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   useEffect(() => {
     setTitle(widget.title);
-    setInlineTitleValue(widget.title);
     setOpacity(widget.opacity);
     setRotation(widget.rotation);
     setWidthInput(Math.round(widget.minimized ? (widget.preMinimizeSize?.w || 400) : widget.size.w));
@@ -225,49 +220,87 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const handleRestore = async (e: React.MouseEvent) => {
     e.stopPropagation();
     const restoreSize = widget.preMinimizeSize || { w: 400, h: 300 };
+    
+    let targetX = widget.position.x;
+    let targetY = widget.position.y;
+
+    const viewport = containerRef.current?.closest('.overflow-hidden');
+    if (viewport && !isCanvas) {
+      const rect = viewport.getBoundingClientRect();
+      const containerW = rect.width;
+      const containerH = rect.height;
+
+      if (targetX + restoreSize.w > containerW) {
+        targetX = Math.max(0, containerW - restoreSize.w);
+      }
+      if (targetY + restoreSize.h > containerH) {
+        targetY = Math.max(0, containerH - restoreSize.h);
+      }
+    }
+
     await commitWidgetUpdate(widget.id, {
       minimized: false,
-      size: restoreSize
+      size: restoreSize,
+      position: { x: targetX, y: targetY }
     });
   };
 
-  const handleInlineTitleSave = async () => {
-    setIsEditingTitleInline(false);
-    if (inlineTitleValue.trim() && inlineTitleValue.trim() !== widget.title) {
-      await commitWidgetUpdate(widget.id, { title: inlineTitleValue.trim() });
-    }
-  };
 
-  const isSelected = selectedWidgetId === widget.id && isEditMode && !isFullscreenMode;
-  const isLocked = widget.locked;
+
+  const isSelected = selectedWidgetId === widget.id && !isFullscreenMode;
 
   // Pointer drag start
+  const DRAG_THRESHOLD = 5; // px
+
   const handleDragStart = (e: React.PointerEvent) => {
-    if (!isEditMode || isLocked || isFullscreenMode) return;
+    if (isFullscreenMode) return;
     
     const target = e.target as HTMLElement;
-    const isHeader = target.closest('.widget-header-drag') !== null || (widget.minimized && !target.closest('button') && !target.closest('input'));
-    if (!isHeader) return;
+    const tagName = target.tagName.toLowerCase();
+    const isMediaElement = tagName === 'video' || tagName === 'audio' || tagName === 'canvas' || tagName === 'img';
 
-    setIsDragging(true);
+    if (!isMediaElement) {
+      // Block drag on true interactive controls
+      const isInteractive = 
+        target.closest('button') !== null || 
+        target.closest('input') !== null || 
+        target.closest('select') !== null || 
+        target.closest('textarea') !== null || 
+        target.closest('a') !== null || 
+        target.closest('label') !== null ||
+        target.closest('[role="button"]') !== null;
+      if (isInteractive) return;
+    }
+
+    // Record pending drag start — actual drag only fires after threshold movement
+    setDragPending(true);
     setDragStart({
       x: e.clientX,
       y: e.clientY,
       wX: widget.position.x,
       wY: widget.position.y
     });
-
     setSelectedWidgetId(widget.id);
     containerRef.current?.setPointerCapture(e.pointerId);
     e.stopPropagation();
   };
 
   const handleDragMove = (e: React.PointerEvent) => {
-    if (!isDragging) return;
+    if (!dragPending && !isDragging) return;
+
+    const rawDx = e.clientX - dragStart.x;
+    const rawDy = e.clientY - dragStart.y;
+
+    // Activate drag only after threshold is crossed
+    if (!isDragging) {
+      if (Math.sqrt(rawDx * rawDx + rawDy * rawDy) < DRAG_THRESHOLD) return;
+      setIsDragging(true);
+      setDragPending(false);
+    }
 
     const scaleFactor = zoom;
-    const deltaX = (e.clientX - dragStart.x) / scaleFactor;
-    const deltaY = (e.clientY - dragStart.y) / scaleFactor;
+    const deltaX = rawDx / scaleFactor;
+    const deltaY = rawDy / scaleFactor;
 
     let targetX = dragStart.wX + deltaX;
     let targetY = dragStart.wY + deltaY;
@@ -284,19 +317,21 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   };
 
   const handleDragEnd = (e: React.PointerEvent) => {
-    if (!isDragging) return;
+    if (!isDragging && !dragPending) return;
     setIsDragging(false);
+    setDragPending(false);
     containerRef.current?.releasePointerCapture(e.pointerId);
     
-    commitWidgetUpdate(widget.id, {
-      position: { x: widget.position.x, y: widget.position.y }
-    });
-
-    if (onDragEnd) onDragEnd();
+    if (isDragging) {
+      commitWidgetUpdate(widget.id, {
+        position: { x: widget.position.x, y: widget.position.y }
+      });
+      if (onDragEnd) onDragEnd();
+    }
   };
 
   const handleResizeStart = (e: React.PointerEvent) => {
-    if (!isEditMode || isLocked || isFullscreenMode) return;
+    if (isFullscreenMode) return;
     
     setIsResizing(true);
     setResizeStart({
@@ -316,32 +351,11 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     if (!isResizing) return;
 
     const scaleFactor = zoom;
-    const deltaW = (e.clientX - resizeStart.x) / scaleFactor;
-    const deltaH = (e.clientY - resizeStart.y) / scaleFactor;
+    const deltaX = (e.clientX - resizeStart.x) / scaleFactor;
+    const deltaY = (e.clientY - resizeStart.y) / scaleFactor;
 
-    let targetW = Math.max(150, resizeStart.wW + deltaW);
-    let targetH = Math.max(100, resizeStart.wH + deltaH);
-
-    // Limit resize to keep widget inside viewport boundaries
-    const viewport = containerRef.current?.closest('.overflow-hidden');
-    if (viewport) {
-      const rect = viewport.getBoundingClientRect();
-      const containerW = rect.width;
-      const containerH = rect.height;
-
-      if (isCanvas) {
-        // Infinite Canvas bounds: don't let it grow beyond the current viewport edges
-        const viewportMaxX = (-panOffset.x + containerW) / zoom;
-        const viewportMaxY = (-panOffset.y + containerH) / zoom;
-        
-        targetW = Math.min(targetW, Math.max(150, viewportMaxX - widget.position.x));
-        targetH = Math.min(targetH, Math.max(100, viewportMaxY - widget.position.y));
-      } else {
-        // Free / Snap layout bounds: keep strictly within container borders
-        targetW = Math.min(targetW, Math.max(150, containerW - widget.position.x));
-        targetH = Math.min(targetH, Math.max(100, containerH - widget.position.y));
-      }
-    }
+    const targetW = Math.max(150, resizeStart.wW + deltaX);
+    const targetH = Math.max(100, resizeStart.wH + deltaY);
 
     updateWidgetLocal(widget.id, {
       size: { w: targetW, h: targetH }
@@ -378,9 +392,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     const type = widget.styles.backgroundType || 'glass';
     const val = widget.styles.backgroundValue || '';
     
-    if (type === 'solid' && val) return { backgroundColor: val };
-    if (type === 'gradient' && val) return { backgroundImage: val };
-    if (type === 'image' && val) return { backgroundImage: `url(${val})`, backgroundSize: 'cover', backgroundPosition: 'center' };
+    if (type === 'solid') return { backgroundColor: val };
+    if (type === 'gradient') return { backgroundImage: val };
+    if (type === 'image') return { backgroundImage: `url(${val})`, backgroundSize: 'cover', backgroundPosition: 'center' };
     return {};
   };
 
@@ -453,6 +467,11 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       onPointerDown={handleDragStart}
       onPointerMove={isResizing ? handleResizeMove : handleDragMove}
       onPointerUp={isResizing ? handleResizeEnd : handleDragEnd}
+      onPointerDownCapture={() => {
+        if (selectedWidgetId !== widget.id) {
+          setSelectedWidgetId(widget.id);
+        }
+      }}
       style={getWidgetStyle()}
       className={`flex flex-col select-none group/container ${
         isFullscreenMode ? 'w-full h-full relative' : 'absolute'
@@ -482,55 +501,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         >
           <div className="flex items-center gap-2 overflow-hidden flex-1 select-none pr-1">
             {getModuleIcon(widget.moduleType)}
-            {isEditingTitleInline ? (
-              <input
-                type="text"
-                value={inlineTitleValue}
-                onChange={(e) => setInlineTitleValue(e.target.value)}
-                onBlur={handleInlineTitleSave}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleInlineTitleSave();
-                  if (e.key === 'Escape') {
-                    setInlineTitleValue(widget.title);
-                    setIsEditingTitleInline(false);
-                  }
-                }}
-                autoFocus
-                onClick={(e) => e.stopPropagation()}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="bg-transparent border-b border-cyan-accent outline-none text-xs text-primary-text font-semibold w-full px-0.5 py-0"
-              />
-            ) : (
-              <span 
-                onDoubleClick={(e) => {
-                  if (isEditMode) {
-                    e.stopPropagation();
-                    setIsEditingTitleInline(true);
-                  }
-                }}
-                className="text-xs font-semibold text-primary-text truncate cursor-pointer select-none"
-                title={isEditMode ? "Double click to rename" : "Click to restore"}
-              >
-                {widget.title}
-              </span>
-            )}
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {isEditMode && !isLocked && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsEditingTitleInline(true);
-                }}
-                className="p-1 rounded-full hover:bg-glass-bg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors"
-                title="Rename widget"
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
-                </svg>
-              </button>
-            )}
             <button
               onClick={handleRestore}
               className="p-1 rounded-full hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
@@ -555,60 +528,12 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
               : 'border-color-border-color hover:border-white/10'
           } ${backgroundType === 'glass' ? 'glass-panel' : ''}`}
         >
-          {/* Widget Header Area */}
-          <div 
-            className={`h-11 flex items-center justify-between px-4 border-b border-color-border-color select-none ${
-              isEditMode && !isLocked && !isFullscreenMode ? 'widget-header-drag cursor-move bg-glass-bg/30' : ''
-            }`}
-          >
-            <div className="flex items-center gap-2 max-w-[60%]">
-              {isEditMode && !isLocked && !isFullscreenMode && (
-                <Move className="w-3.5 h-3.5 text-muted-text" />
-              )}
-              {isLocked && <Lock className="w-3 h-3 text-muted-text" />}
-              
-              {isEditingTitleInline ? (
-                <input
-                  type="text"
-                  value={inlineTitleValue}
-                  onChange={(e) => setInlineTitleValue(e.target.value)}
-                  onBlur={handleInlineTitleSave}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleInlineTitleSave();
-                    if (e.key === 'Escape') {
-                      setInlineTitleValue(widget.title);
-                      setIsEditingTitleInline(false);
-                    }
-                  }}
-                  autoFocus
-                  onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="bg-transparent border-b border-cyan-accent outline-none text-xs text-primary-text font-semibold w-full px-0.5 py-0"
-                />
-              ) : (
-                <span 
-                  onDoubleClick={(e) => {
-                    if (isEditMode && !isLocked) {
-                      e.stopPropagation();
-                      setIsEditingTitleInline(true);
-                    }
-                  }}
-                  className="text-xs font-semibold tracking-wide text-primary-text truncate"
-                  title={isEditMode && !isLocked ? "Double click to rename" : undefined}
-                >
-                  {widget.title}
-                </span>
-              )}
-
-              {isSelected && !isFullscreenMode && (
-                <span className="text-[9px] font-mono text-muted-text ml-1 border border-color-border-color px-1.5 py-0.5 rounded bg-glass-bg/50">
-                  {Math.round(widget.size.w)}×{Math.round(widget.size.h)}
-                </span>
-              )}
-            </div>
-
-            {/* Minimize button — always visible outside 3-dot menu */}
-            {!isFullscreenMode && (
+          {/* Floating Controls Overlay (Visible when active/selected) */}
+          {selectedWidgetId === widget.id && !isFullscreenMode && (
+            <div 
+              className="absolute top-2 right-2 flex items-center gap-1 p-1 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 z-[30] pointer-events-auto shadow-lg"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
               <button
                 onClick={handleMinimize}
                 className="p-1 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer transition-colors shrink-0"
@@ -616,176 +541,135 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
-            )}
 
-            {/* 3-Dot Actions Menu */}
-            <div className="relative flex items-center shrink-0">
-              <button
-                ref={dropdownBtnRef}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (showDropdown) {
-                    setShowDropdown(false);
-                  } else {
-                    openDropdown();
-                  }
-                }}
-                className="p-1 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
-                title="Widget options"
-              >
-                <MoreVertical className="w-4 h-4" />
-              </button>
-              
-              {showDropdown && dropdownPos && createPortal(
-                <div
-                  ref={dropdownPanelRef}
-                  style={{
-                    position: 'fixed',
-                    top: dropdownPos.top,
-                    ...(dropdownPos.right !== undefined ? { right: dropdownPos.right } : {}),
-                    ...(dropdownPos.left !== undefined ? { left: dropdownPos.left } : {}),
-                    zIndex: 9999,
+              <div className="relative flex items-center shrink-0">
+                <button
+                  ref={dropdownBtnRef}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (showDropdown) {
+                      setShowDropdown(false);
+                    } else {
+                      openDropdown();
+                    }
                   }}
-                  className="w-48 glass-panel bg-black/95 backdrop-blur-3xl rounded-xl p-1.5 shadow-[0_0_30px_rgba(0,0,0,0.8)] border border-color-border-color flex flex-col gap-0.5 text-xs text-secondary-text select-none"
+                  className="p-1 rounded-lg hover:bg-glass-bg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
+                  title="Widget options"
                 >
-                  {/* Toggle controls inside the widget */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowWidgetControls(!showWidgetControls);
-                      setShowDropdown(false);
+                  <MoreVertical className="w-3.5 h-3.5" />
+                </button>
+              
+                {showDropdown && dropdownPos && createPortal(
+                  <div
+                    ref={dropdownPanelRef}
+                    style={{
+                      position: 'fixed',
+                      top: dropdownPos.top,
+                      ...(dropdownPos.right !== undefined ? { right: dropdownPos.right } : {}),
+                      ...(dropdownPos.left !== undefined ? { left: dropdownPos.left } : {}),
+                      zIndex: 9999,
                     }}
-                    className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer ${
-                      showWidgetControls ? 'text-cyan-accent font-semibold bg-cyan-accent/5' : ''
-                    }`}
+                    className="w-48 glass-panel bg-black/95 backdrop-blur-3xl rounded-xl p-1.5 shadow-[0_0_30px_rgba(0,0,0,0.8)] border border-color-border-color flex flex-col gap-0.5 text-xs text-secondary-text select-none"
                   >
-                    <Settings className="w-3.5 h-3.5" />
-                    <span>{showWidgetControls ? 'Hide Controls' : 'Show Controls'}</span>
-                  </button>
+                    {/* Toggle controls inside the widget */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newVal = !showWidgetControls;
+                        setShowWidgetControls(newVal);
+                        commitWidgetUpdate(widget.id, { uiState: { showControls: newVal } });
+                        setShowDropdown(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer ${
+                        showWidgetControls ? 'text-cyan-accent font-semibold bg-cyan-accent/5' : ''
+                      }`}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      <span>{showWidgetControls ? 'Hide Controls' : 'Show Controls'}</span>
+                    </button>
 
-                  <div className="h-[1px] bg-color-border-color my-0.5" />
+                    <div className="h-[1px] bg-color-border-color my-0.5" />
 
-                  {/* Lock/Unlock */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      commitWidgetUpdate(widget.id, { locked: !isLocked });
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    {isLocked ? <Unlock className="w-3.5 h-3.5" /> : <Lock className="w-3.5 h-3.5" />}
-                    <span>{isLocked ? 'Unlock Widget' : 'Lock Widget'}</span>
-                  </button>
+                    {/* Fullscreen */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setFullscreenWidgetId(isFullscreenMode ? null : widget.id);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
+                    >
+                      {isFullscreenMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                      <span>{isFullscreenMode ? 'Exit Fullscreen' : 'Fullscreen'}</span>
+                    </button>
 
-                  {/* Fullscreen */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setFullscreenWidgetId(isFullscreenMode ? null : widget.id);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    {isFullscreenMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                    <span>{isFullscreenMode ? 'Exit Fullscreen' : 'Fullscreen'}</span>
-                  </button>
+                    {/* Styling Settings Modal trigger */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSettings(true);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Styling Settings</span>
+                    </button>
 
-                  {/* Styling Settings Modal trigger */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowSettings(true);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                    <span>Styling Settings</span>
-                  </button>
+                    <div className="h-[1px] bg-color-border-color my-0.5" />
 
-                  <div className="h-[1px] bg-color-border-color my-0.5" />
+                    {/* Duplicate */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateWidget(widget.id);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Duplicate</span>
+                    </button>
 
-                  {/* Bring to Front */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      bringToFront(widget.id);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>Bring to Front</span>
-                  </button>
+                    {/* Copy */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyWidget(widget);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
+                    >
+                      <Clipboard className="w-3.5 h-3.5" />
+                      <span>Copy to Clipboard</span>
+                    </button>
 
-                  {/* Send to Back */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      sendToBack(widget.id);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    <EyeOff className="w-3.5 h-3.5" />
-                    <span>Send to Back</span>
-                  </button>
+                    <div className="h-[1px] bg-color-border-color my-0.5" />
 
-                  {/* Duplicate */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      duplicateWidget(widget.id);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Duplicate</span>
-                  </button>
-
-                  {/* Copy */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      copyWidget(widget);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-primary-text transition-colors cursor-pointer"
-                  >
-                    <Clipboard className="w-3.5 h-3.5" />
-                    <span>Copy to Clipboard</span>
-                  </button>
-
-                  <div className="h-[1px] bg-color-border-color my-0.5" />
-
-                  {/* Delete */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteWidget(widget.id);
-                      setShowDropdown(false);
-                    }}
-                    className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-red-500 transition-colors cursor-pointer text-red-500/80 hover:text-red-500 font-semibold"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                    <span>Delete Widget</span>
-                  </button>
-                </div>,
-                document.body
-              )}
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteWidget(widget.id);
+                        setShowDropdown(false);
+                      }}
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 hover:bg-glass-bg hover:text-red-500 transition-colors cursor-pointer text-red-500/80 hover:text-red-500 font-semibold"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete Widget</span>
+                    </button>
+                  </div>,
+                  document.body
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Widget Body Content */}
           <div className="flex-1 w-full overflow-hidden relative">
@@ -793,7 +677,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           </div>
 
           {/* Resize Handle overlay */}
-          {isEditMode && !isLocked && !isFullscreenMode && (
+          {!isFullscreenMode && (
             <div
               onPointerDown={handleResizeStart}
               className="absolute bottom-1 right-1 w-4 h-4 cursor-se-resize flex items-end justify-end p-0.5 z-10 text-muted-text hover:text-cyan-accent transition-colors"

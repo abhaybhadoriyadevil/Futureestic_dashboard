@@ -10,8 +10,6 @@ import {
   Search, 
   Sun, 
   Moon, 
-  Lock, 
-  Unlock, 
   Plus, 
   Download, 
   Upload, 
@@ -36,7 +34,7 @@ export const TopNavbar: React.FC = () => {
   const { dashboards, activeDashboardId } = useDashboardStore();
   const { addWidget, widgets } = useWidgetStore();
   const { theme, toggleTheme } = useThemeStore();
-  const { isEditMode, setEditMode, zoom, resetCanvas } = useLayoutStore();
+  const { zoom, resetCanvas } = useLayoutStore();
   const { setOpen: setSearchOpen } = useSearchStore();
   const { copiedWidget, pasteWidget } = useClipboardStore();
 
@@ -310,28 +308,7 @@ export const TopNavbar: React.FC = () => {
           )}
         </div>
 
-        {/* Customize Canvas/Lock Toggle */}
-        <button
-          onClick={() => setEditMode(!isEditMode)}
-          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
-            isEditMode
-              ? 'bg-purple-accent/15 text-purple-accent border border-purple-accent/30 shadow-[0_0_12px_rgba(139,92,246,0.1)] animate-pulse'
-              : 'bg-glass-bg border border-color-border-color text-secondary-text hover:text-primary-text hover:border-purple-accent'
-          }`}
-          title={isEditMode ? "Lock widgets down" : "Drag, resize & edit widgets"}
-        >
-          {isEditMode ? (
-            <>
-              <Unlock className="w-4 h-4" />
-              <span>Unlock layout</span>
-            </>
-          ) : (
-            <>
-              <Lock className="w-4 h-4" />
-              <span>Lock layout</span>
-            </>
-          )}
-        </button>
+
 
         {/* System Settings & Backups */}
         <div className="relative">

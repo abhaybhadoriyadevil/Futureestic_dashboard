@@ -39,6 +39,7 @@ export interface Widget {
     trigger?: 'load' | 'hover' | 'click' | 'update';
   };
   dataRef?: string; // Links to data ID or stores inline config (like custom statistics or Kanban lanes)
+  uiState?: Record<string, any>; // Persisted UI preferences (showControls, showPlaylist, etc.)
   locked: boolean;
   visible: boolean;
   minimized?: boolean; // Whether the widget is collapsed to a pill

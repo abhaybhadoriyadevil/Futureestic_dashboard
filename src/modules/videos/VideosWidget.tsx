@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../../core/storage/db';
 import type { FileData } from '../../types';
 import { useWidgetStore } from '../../stores/useWidgetStore';
+import { useContainerSize } from '../../hooks/useContainerSize';
 import { 
   Play, 
   Pause, 
@@ -25,6 +26,7 @@ interface VideosWidgetProps {
 
 export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
+  const { ref: containerRef2, isSM, sz } = useContainerSize();
   const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -45,6 +47,12 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
           setFileIds(parsed.fileIds);
         } else {
           setFileIds([]);
+        }
+        if (parsed.activeVideoId) {
+          setActiveVideoId(parsed.activeVideoId);
+        }
+        if (parsed.showPlaylist !== undefined) {
+          setShowPlaylist(parsed.showPlaylist);
         }
       } catch (e) {
         setFileIds([]);
@@ -74,9 +82,18 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
 
   useEffect(() => {
     if (videos.length > 0 && !activeVideoId) {
+      if (dataRef) {
+        try {
+          const parsed = JSON.parse(dataRef);
+          if (parsed.activeVideoId && videos.some(v => v.id === parsed.activeVideoId)) {
+            setActiveVideoId(parsed.activeVideoId);
+            return;
+          }
+        } catch (e) {}
+      }
       setActiveVideoId(videos[0].id);
     }
-  }, [videos, activeVideoId]);
+  }, [videos, activeVideoId, dataRef]);
 
   // Handle play/pause commands
   const togglePlay = () => {
@@ -142,7 +159,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
       
       const newFileIds = [...fileIds, id];
       await commitWidgetUpdate(widgetId, {
-        dataRef: JSON.stringify({ fileIds: newFileIds })
+        dataRef: JSON.stringify({ fileIds: newFileIds, activeVideoId: id, showPlaylist })
       });
       setActiveVideoId(id);
     } catch (err) {
@@ -157,7 +174,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
   };
 
   return (
-    <div className="w-full h-full flex text-xs text-primary-text bg-transparent overflow-hidden">
+    <div ref={containerRef2} className="w-full h-full flex text-xs text-primary-text bg-transparent overflow-hidden">
       
       {/* 1. Main Video Screen */}
       <div className="flex-1 flex flex-col justify-between p-4 overflow-hidden">
@@ -205,8 +222,25 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {showControls && (
+                    <label className="text-white hover:text-cyan-accent cursor-pointer mr-1" title="Upload Video">
+                      <Upload className="w-4 h-4" />
+                      <input
+                        type="file"
+                        accept="video/*,video/mp4,video/webm,video/ogg,video/mov,video/mkv,video/avi,.mp4,.webm,.ogg,.mov,.mkv,.avi"
+                        onChange={handleUploadVideo}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                   <button 
-                    onClick={() => setShowPlaylist(!showPlaylist)} 
+                    onClick={() => {
+                      const newVal = !showPlaylist;
+                      setShowPlaylist(newVal);
+                      commitWidgetUpdate(widgetId, {
+                        dataRef: JSON.stringify({ fileIds, activeVideoId, showPlaylist: newVal })
+                      });
+                    }}
                     className={`text-white hover:text-cyan-accent cursor-pointer ${showPlaylist ? 'text-cyan-accent' : ''}`}
                     title="Playlist toggle"
                   >
@@ -222,34 +256,26 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
           </div>
         ) : (
           <div className="flex-1 w-full bg-black/30 rounded-xl border border-dashed border-color-border-color flex flex-col items-center justify-center gap-3 text-muted-text">
-            <Tv className="w-10 h-10" />
-            <span>No video files loaded in workspace.</span>
+            <Tv className={sz === 'xs' ? 'w-6 h-6' : 'w-10 h-10'} />
+            {!isSM && <span>No video files loaded in workspace.</span>}
+            {showControls && (
+              <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
+                <Upload className="w-3.5 h-3.5 text-cyan-accent" />
+                <span>Upload Video</span>
+                <input
+                  type="file"
+                  accept="video/*,video/mp4,video/webm,video/ogg,video/mov,video/mkv,video/avi,.mp4,.webm,.ogg,.mov,.mkv,.avi"
+                  onChange={handleUploadVideo}
+                  className="hidden"
+                />
+              </label>
+            )}
           </div>
         )}
-
-        {/* Bottom File Upload and Title details */}
-        <div className="w-full flex items-center justify-between border-t border-color-border-color pt-3 mt-3">
-          <span className="font-semibold truncate max-w-[60%]">
-            {activeVideo?.name || 'Local Media OS'}
-          </span>
-          
-          {showControls && (
-            <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
-              <Upload className="w-3.5 h-3.5 text-cyan-accent" />
-              <span>Upload MP4</span>
-              <input
-                type="file"
-                accept="video/*,video/mp4,video/webm,video/ogg,video/mov,video/mkv,video/avi,.mp4,.webm,.ogg,.mov,.mkv,.avi"
-                onChange={handleUploadVideo}
-                className="hidden"
-              />
-            </label>
-          )}
-        </div>
       </div>
 
-      {/* 2. Playlist Sidebar */}
-      {showPlaylist && videos.length > 0 && (
+      {/* 2. Playlist Sidebar — hidden on very small widgets */}
+      {!isSM && showPlaylist && videos.length > 0 && (
         <div className="w-1/3 border-l border-color-border-color p-3 flex flex-col gap-2 bg-secondary-bg/10 overflow-y-auto no-scrollbar">
           <span className="text-[10px] font-bold text-muted-text uppercase tracking-widest flex items-center gap-1 border-b border-color-border-color pb-1.5 mb-1.5">
             <List className="w-3.5 h-3.5" />
@@ -261,9 +287,12 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
               return (
                 <button
                   key={v.id}
-                  onClick={() => {
+                  onClick={async () => {
                     setActiveVideoId(v.id);
                     setIsPlaying(false);
+                    await commitWidgetUpdate(widgetId, {
+                      dataRef: JSON.stringify({ fileIds, activeVideoId: v.id, showPlaylist })
+                    });
                   }}
                   className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex justify-between items-center cursor-pointer ${
                     isActive 
