@@ -102,7 +102,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownBtnRef = useRef<HTMLButtonElement>(null);
   const dropdownPanelRef = useRef<HTMLDivElement>(null);
-  const [dropdownPos, setDropdownPos] = useState<{ top: number; right?: number; left?: number } | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top?: number; bottom?: number; right?: number; left?: number } | null>(null);
   
   // Dragging states
   const [isDragging, setIsDragging] = useState(false);
@@ -140,22 +140,27 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     if (dropdownBtnRef.current) {
       const rect = dropdownBtnRef.current.getBoundingClientRect();
       const dropdownWidth = 192; // w-48 = 12rem = 192px
-      const dropdownHeight = 220; // actual approx menu height (6 items)
+      // approximate height used ONLY for collision detection
+      const estimatedHeight = 220; 
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
 
-      // Default: align right edge with button right, drop below
-      let top = rect.bottom + 4;
+      // Default: drop below
+      let top: number | undefined = rect.bottom + 4;
+      let bottom: number | undefined = undefined;
+      
       let right: number | undefined = viewportWidth - rect.right;
       let left: number | undefined = undefined;
 
       // Flip up if not enough space below
-      if (top + dropdownHeight > viewportHeight - 8) {
-        top = rect.top - dropdownHeight - 4;
+      if (top + estimatedHeight > viewportHeight - 8) {
+        top = undefined;
+        // Anchor the bottom of the menu just above the button's top edge
+        bottom = viewportHeight - rect.top + 4;
+      } else {
+        // Clamp so it never goes off-screen top if dropping down normally
+        top = Math.max(8, top);
       }
-
-      // Clamp so it never goes off-screen top
-      top = Math.max(8, top);
       
       // Ensure right edge doesn't go off-screen left
       if (rect.right - dropdownWidth < 8) {
@@ -163,7 +168,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         left = Math.max(8, rect.left);
       }
 
-      setDropdownPos({ top, right, left });
+      setDropdownPos({ top, bottom, right, left });
     }
     setShowDropdown(true);
   }, []);
@@ -564,7 +569,8 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
                     ref={dropdownPanelRef}
                     style={{
                       position: 'fixed',
-                      top: dropdownPos.top,
+                      ...(dropdownPos.top !== undefined ? { top: dropdownPos.top } : {}),
+                      ...(dropdownPos.bottom !== undefined ? { bottom: dropdownPos.bottom } : {}),
                       ...(dropdownPos.right !== undefined ? { right: dropdownPos.right } : {}),
                       ...(dropdownPos.left !== undefined ? { left: dropdownPos.left } : {}),
                       zIndex: 9999,
