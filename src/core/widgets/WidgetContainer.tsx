@@ -109,6 +109,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragPending, setDragPending] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0, wX: 0, wY: 0 });
+  const dragTargetRef = useRef<HTMLElement | null>(null);
 
   // Resizing states
   const [isResizing, setIsResizing] = useState(false);
@@ -263,7 +264,10 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     
     const target = e.target as HTMLElement;
     const tagName = target.tagName.toLowerCase();
-    const isMediaElement = tagName === 'video' || tagName === 'audio' || tagName === 'canvas' || tagName === 'img';
+    
+    // Explicitly allow dragging if clicking on a designated drag handle
+    const isDragHandle = target.closest('.drag-handle') !== null;
+    const isMediaElement = tagName === 'video' || tagName === 'audio' || tagName === 'canvas' || tagName === 'img' || isDragHandle;
 
     if (!isMediaElement) {
       // Block drag on true interactive controls
@@ -286,6 +290,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       wX: widget.position.x,
       wY: widget.position.y
     });
+    dragTargetRef.current = target;
     setSelectedWidgetId(widget.id);
     containerRef.current?.setPointerCapture(e.pointerId);
     e.stopPropagation();
@@ -324,9 +329,19 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
   const handleDragEnd = (e: React.PointerEvent) => {
     if (!isDragging && !dragPending) return;
+    
+    containerRef.current?.releasePointerCapture(e.pointerId);
+
+    // If it was just a click (no drag happened), synthesize a click event on the original target
+    // This is necessary because pointer capture redirects the pointerup event to the container,
+    // which prevents the browser from firing a native click event.
+    if (!isDragging && dragPending && dragTargetRef.current) {
+      dragTargetRef.current.click();
+    }
+
     setIsDragging(false);
     setDragPending(false);
-    containerRef.current?.releasePointerCapture(e.pointerId);
+    dragTargetRef.current = null;
     
     if (isDragging) {
       commitWidgetUpdate(widget.id, {
