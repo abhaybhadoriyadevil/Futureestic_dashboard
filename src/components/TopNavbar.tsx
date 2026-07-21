@@ -28,11 +28,12 @@ import {
   Target,
   Film,
   Music,
-  Type
+  Type,
+  Wallpaper
 } from 'lucide-react';
 
 export const TopNavbar: React.FC = () => {
-  const { dashboards, activeDashboardId } = useDashboardStore();
+  const { dashboards, activeDashboardId, updateDashboard } = useDashboardStore();
   const { addWidget, widgets } = useWidgetStore();
   const { theme, toggleTheme } = useThemeStore();
   const { zoom, resetCanvas } = useLayoutStore();
@@ -41,7 +42,9 @@ export const TopNavbar: React.FC = () => {
 
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showBackupMenu, setShowBackupMenu] = useState(false);
+  const [showBgMenu, setShowBgMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const bgInputRef = useRef<HTMLInputElement>(null);
 
   const activeDashboard = dashboards.find(d => d.id === activeDashboardId);
 
@@ -202,6 +205,47 @@ export const TopNavbar: React.FC = () => {
     }
   };
 
+  const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!activeDashboard) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const isVideo = file.type.startsWith('video/');
+      const bgType = isVideo ? 'video' : 'image';
+      
+      const fileId = `bg-${Date.now()}`;
+      await db.files.add({
+        id: fileId,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        blob: file,
+        tags: ['background'],
+        category: 'Backgrounds',
+        createdAt: Date.now()
+      });
+
+      await updateDashboard(activeDashboard.id, {
+        backgroundType: bgType,
+        backgroundFileId: fileId
+      });
+      setShowBgMenu(false);
+    } catch (err) {
+      console.error('Failed to upload background', err);
+      alert('Failed to upload background file.');
+    }
+  };
+
+  const removeBackground = async () => {
+    if (!activeDashboard) return;
+    await updateDashboard(activeDashboard.id, {
+      backgroundType: 'theme',
+      backgroundFileId: undefined
+    });
+    setShowBgMenu(false);
+  };
+
   const widgetTypes = [
     { type: 'notes', label: 'Rich Text & MD', icon: <FileText className="w-4 h-4 text-blue-accent" /> },
     { type: 'calendar', label: 'Calendar OS', icon: <Calendar className="w-4 h-4 text-purple-accent" /> },
@@ -255,6 +299,53 @@ export const TopNavbar: React.FC = () => {
             <RefreshCw className="w-3.5 h-3.5" />
             <span>Recenter ({Math.round(zoom * 100)}%)</span>
           </button>
+        )}
+
+        {/* Background Settings button (only for Snap/Free layouts) */}
+        {activeDashboard?.layoutType !== 'canvas' && (
+          <div className="relative">
+            <button 
+              onClick={() => {
+                setShowBgMenu(!showBgMenu);
+                setShowAddMenu(false);
+                setShowBackupMenu(false);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-color-border-color text-xs transition-colors cursor-pointer ${
+                showBgMenu ? 'bg-cyan-accent text-black' : 'bg-glass-bg text-secondary-text hover:border-cyan-accent hover:text-primary-text'
+              }`}
+            >
+              <Wallpaper className="w-3.5 h-3.5" />
+              <span>Background</span>
+            </button>
+            {showBgMenu && (
+              <div className="absolute top-full right-0 mt-2 w-48 bg-black/90 backdrop-blur-xl border border-color-border-color rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1">
+                <div className="px-2 py-1.5 text-[10px] font-bold text-muted-text uppercase tracking-wider mb-1">
+                  Workspace Background
+                </div>
+                <button
+                  onClick={() => bgInputRef.current?.click()}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-glass-bg text-left text-xs text-primary-text"
+                >
+                  <Upload className="w-4 h-4 text-cyan-accent" />
+                  Upload Image / Video
+                </button>
+                <input 
+                  type="file" 
+                  ref={bgInputRef} 
+                  onChange={handleBackgroundUpload} 
+                  accept="image/*,video/mp4,video/webm" 
+                  className="hidden" 
+                />
+                <button
+                  onClick={removeBackground}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-red-500/20 text-left text-xs text-red-500 hover:text-red-400"
+                >
+                  <X className="w-4 h-4" />
+                  Clear Background
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Paste Widget button — shows when clipboard has content */}

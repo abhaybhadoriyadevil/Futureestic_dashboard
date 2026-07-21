@@ -5,6 +5,8 @@ export interface Dashboard {
   description: string;
   layoutType: 'free' | 'snap' | 'canvas';
   themeId: string;
+  backgroundType?: 'theme' | 'image' | 'video';
+  backgroundFileId?: string;
   createdAt: number;
   updatedAt: number;
 }

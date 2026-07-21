@@ -6,6 +6,7 @@ import { useLayoutStore } from '../../stores/useLayoutStore';
 import { useThemeStore } from '../../stores/useThemeStore';
 import { useSelectionStore } from '../../stores/useSelectionStore';
 import { WidgetContainer } from '../widgets/WidgetContainer';
+import { WorkspaceBackground } from './WorkspaceBackground';
 
 export const DashboardCanvas: React.FC = () => {
   const { dashboards, activeDashboardId } = useDashboardStore();
@@ -187,6 +188,9 @@ export const DashboardCanvas: React.FC = () => {
     >
       {/* Mesh grid background */}
       <div className="absolute inset-0 canvas-grid-pattern opacity-60 pointer-events-none" />
+
+      {/* Custom Image/Video Background (only for Free/Snap layouts) */}
+      <WorkspaceBackground dashboard={activeDashboard} />
 
       {/* Snap Guides Visual Overlay */}
       <AnimatePresence>
