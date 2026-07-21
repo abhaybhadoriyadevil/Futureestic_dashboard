@@ -27,7 +27,8 @@ import {
   ClipboardPaste,
   Target,
   Film,
-  Music
+  Music,
+  Type
 } from 'lucide-react';
 
 export const TopNavbar: React.FC = () => {
@@ -214,6 +215,7 @@ export const TopNavbar: React.FC = () => {
     { type: 'videos', label: 'Video Player', icon: <Film className="w-4 h-4 text-purple-accent" /> },
     { type: 'audio', label: 'Audio / Music', icon: <Music className="w-4 h-4 text-pink-500" /> },
     { type: 'habits', label: 'Habit Tracker', icon: <Target className="w-4 h-4 text-orange-500" /> },
+    { type: 'text', label: 'Plain Text', icon: <Type className="w-4 h-4 text-cyan-accent" /> },
   ];
 
   return (

@@ -44,6 +44,7 @@ const ChartsWidget = React.lazy(() => import('../../modules/charts/ChartsWidget'
 const KanbanWidget = React.lazy(() => import('../../modules/kanban/KanbanWidget').then(m => ({ default: m.KanbanWidget })));
 const MindMapWidget = React.lazy(() => import('../../modules/mindmap/MindMapWidget').then(m => ({ default: m.MindMapWidget })));
 const HabitsWidget = React.lazy(() => import('../../modules/habits/HabitsWidget').then(m => ({ default: m.HabitsWidget })));
+const TextWidget = React.lazy(() => import('../../modules/text/TextWidget').then(m => ({ default: m.TextWidget })));
 
 interface WidgetContainerProps {
   widget: Widget;
@@ -431,6 +432,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
             case 'kanban': return <KanbanWidget {...props} />;
             case 'mindmap': return <MindMapWidget {...props} />;
             case 'habits': return <HabitsWidget {...props} />;
+            case 'text': return <TextWidget {...props} />;
             default: return <div className="p-4 text-xs text-muted-text">Unknown OS module type</div>;
           }
         })()}
