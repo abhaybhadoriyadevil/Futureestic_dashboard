@@ -41,9 +41,8 @@ export const WorkspaceBackground: React.FC<WorkspaceBackgroundProps> = ({ dashbo
         <img 
           src={blobUrl} 
           alt="Workspace Background" 
-          className="w-full h-full object-cover opacity-80"
+          className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       </div>
     );
   }
@@ -54,12 +53,11 @@ export const WorkspaceBackground: React.FC<WorkspaceBackgroundProps> = ({ dashbo
         <video 
           src={blobUrl} 
           autoPlay 
-          loop 
-          muted 
+          loop
+          muted
           playsInline
-          className="w-full h-full object-cover opacity-80"
+          className="w-full h-full object-cover"
         />
-        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
       </div>
     );
   }
