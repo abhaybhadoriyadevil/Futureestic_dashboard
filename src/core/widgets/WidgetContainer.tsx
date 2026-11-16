@@ -4,7 +4,6 @@ import React, {
   useEffect,
   Suspense,
   useCallback,
-  useMemo,
 } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -35,17 +34,15 @@ import {
   Music,
   MoreVertical,
   Sliders,
-  AlertTriangle
-} from 'lucide-react';
-import { useClipboardStore } from '../../stores/useClipboardStore';
-import { useHistoryStore } from '../../stores/useHistoryStore';
-import { 
-  getWorkspaceViewport, 
-  pixelsToPercent, 
-  percentToPixels, 
-  percentToGrid, 
+} from "lucide-react";
+import { useClipboardStore } from "../../stores/useClipboardStore";
+import { useHistoryStore } from "../../stores/useHistoryStore";
+import {
+  getWorkspaceViewport,
+  pixelsToPercent,
+  percentToPixels,
+  percentToGrid,
   clampPercentBounds,
-  findOverlappingWidgets,
 } from "../layout/positionUtils";
 
 // Lazy loaded module components
@@ -169,7 +166,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   onPositioningChange,
 }) => {
   const {
-    widgets,
     updateWidgetLocal,
     commitWidgetUpdate,
     duplicateWidget,
@@ -275,13 +271,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     setPercentW(p.w);
     setPercentH(p.h);
   }, [widget]);
-
-  // Overlap detection with other active widgets
-  const overlappingWidgets = useMemo(() => {
-    if (isFullscreenMode || widget.minimized) return [];
-    return findOverlappingWidgets(widget, widgets);
-  }, [widget, widgets, isFullscreenMode]);
-  const isOverlapping = overlappingWidgets.length > 0;
 
   const [showDropdown, setShowDropdown] = useState(false);
 
@@ -459,7 +448,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     }
 
     // Record pending drag start — actual drag only fires after threshold movement
-    preDragWidgetsRef.current = JSON.parse(JSON.stringify(useWidgetStore.getState().widgets));
+    preDragWidgetsRef.current = JSON.parse(
+      JSON.stringify(useWidgetStore.getState().widgets),
+    );
     setDragPending(true);
     setDragStart({
       x: e.clientX,
@@ -540,10 +531,14 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
         },
         viewport,
       );
-      commitWidgetUpdate(widget.id, {
-        position: { x: widget.position.x, y: widget.position.y },
-        percentPosition: percent,
-      }, true);
+      commitWidgetUpdate(
+        widget.id,
+        {
+          position: { x: widget.position.x, y: widget.position.y },
+          percentPosition: percent,
+        },
+        true,
+      );
       if (onDragEnd) onDragEnd();
     }
     preDragWidgetsRef.current = null;
@@ -555,7 +550,9 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   ) => {
     if (isFullscreenMode) return;
 
-    preResizeWidgetsRef.current = JSON.parse(JSON.stringify(useWidgetStore.getState().widgets));
+    preResizeWidgetsRef.current = JSON.parse(
+      JSON.stringify(useWidgetStore.getState().widgets),
+    );
     setIsResizing(true);
     setResizeDirection(dir);
     setResizeStart({
@@ -613,10 +610,14 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       viewport,
     );
 
-    commitWidgetUpdate(widget.id, {
-      size: { w: widget.size.w, h: widget.size.h },
-      percentPosition: percent,
-    }, true);
+    commitWidgetUpdate(
+      widget.id,
+      {
+        size: { w: widget.size.w, h: widget.size.h },
+        percentPosition: percent,
+      },
+      true,
+    );
     preResizeWidgetsRef.current = null;
     if (onDragEnd) onDragEnd();
   };
@@ -861,19 +862,6 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
                 : "border-color-border-color hover:border-white/10"
           } ${backgroundType === "glass" && !isFullscreenMode ? "glass-panel" : ""}`}
         >
-          {/* Overlap Warning Indicator */}
-          {isOverlapping && !isFullscreenMode && (
-            <div
-              className="absolute top-2 left-2 z-[25] flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/20 border border-amber-500/50 text-[10px] font-mono text-amber-300 pointer-events-none backdrop-blur-md shadow-sm"
-              title={`Overlapping with: ${overlappingWidgets.map((w) => w.title).join(", ")}`}
-            >
-              <AlertTriangle className="w-3 h-3 text-amber-400 shrink-0 animate-pulse" />
-              <span className="truncate max-w-[130px]">
-                Overlap: {overlappingWidgets[0]?.title}
-              </span>
-            </div>
-          )}
-
           {/* Floating Controls Overlay (Visible when active/selected) */}
           {selectedWidgetId === widget.id && !isFullscreenMode && (
             <div

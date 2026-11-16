@@ -379,10 +379,10 @@ export const DashboardCanvas: React.FC = () => {
           disabled={undoStack.length === 0}
           className={`p-2 rounded-xl transition-all flex items-center gap-1 ${
             undoStack.length > 0
-              ? 'text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-90'
-              : 'text-muted-text/30 cursor-not-allowed opacity-40'
+              ? "text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-90"
+              : "text-muted-text/30 cursor-not-allowed opacity-40"
           }`}
-          title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` • ${undoStack.length} action${undoStack.length > 1 ? 's' : ''}` : ''}`}
+          title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` • ${undoStack.length} action${undoStack.length > 1 ? "s" : ""}` : ""}`}
           aria-label="Undo action"
         >
           <Undo2 className="w-4 h-4" />
@@ -394,10 +394,10 @@ export const DashboardCanvas: React.FC = () => {
           disabled={redoStack.length === 0}
           className={`p-2 rounded-xl transition-all flex items-center gap-1 ${
             redoStack.length > 0
-              ? 'text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-90'
-              : 'text-muted-text/30 cursor-not-allowed opacity-40'
+              ? "text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-90"
+              : "text-muted-text/30 cursor-not-allowed opacity-40"
           }`}
-          title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` • ${redoStack.length} action${redoStack.length > 1 ? 's' : ''}` : ''}`}
+          title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` • ${redoStack.length} action${redoStack.length > 1 ? "s" : ""}` : ""}`}
           aria-label="Redo action"
         >
           <Redo2 className="w-4 h-4" />
@@ -410,8 +410,8 @@ export const DashboardCanvas: React.FC = () => {
           onClick={() => setShowGridOverlay(!showGridOverlay)}
           className={`p-2 rounded-xl transition-all cursor-pointer ${
             showGridOverlay || isPositioningActive
-              ? 'bg-cyan-accent/20 text-cyan-accent border border-cyan-accent/40 shadow-[0_0_10px_rgba(6,182,212,0.3)]'
-              : 'text-secondary-text hover:text-primary-text hover:bg-white/5'
+              ? "bg-cyan-accent/20 text-cyan-accent border border-cyan-accent/40 shadow-[0_0_10px_rgba(6,182,212,0.3)]"
+              : "text-secondary-text hover:text-primary-text hover:bg-white/5"
           }`}
           title="Toggle 12×12 Positioning Grid Guidelines"
           aria-label="Toggle grid"
