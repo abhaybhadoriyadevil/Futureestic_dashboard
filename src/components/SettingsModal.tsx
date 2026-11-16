@@ -16,8 +16,10 @@ import {
   Sun, 
   Moon, 
   Terminal, 
-  ShieldCheck 
+  ShieldCheck,
+  Download
 } from 'lucide-react';
+import { db } from '../core/storage/db';
 
 const PRESET_ACCENTS = [
   { name: 'Cyber Cyan', value: '#06b6d4', glow: 'rgba(6, 182, 212, 0.4)' },
@@ -65,8 +67,11 @@ export const SettingsModal: React.FC = () => {
   const [tempUserName, setTempUserName] = useState(userName);
   const [tempUserRole, setTempUserRole] = useState(userRole);
   const [savedBadge, setSavedBadge] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync state when opening
   React.useEffect(() => {
@@ -102,6 +107,106 @@ export const SettingsModal: React.FC = () => {
         }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // Full Workspace JSON Backup Export
+  const handleExportBackup = async () => {
+    try {
+      setIsExporting(true);
+      const dbData = {
+        dashboards: await db.dashboards.toArray(),
+        widgets: await db.widgets.toArray(),
+        notes: await db.notes.toArray(),
+        events: await db.events.toArray(),
+        tables: await db.customTables.toArray(),
+        files: await Promise.all((await db.files.toArray()).map(async f => ({
+          ...f,
+          blobBase64: await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(f.blob);
+          })
+        })))
+      };
+
+      const json = JSON.stringify(dbData, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `personal_os_backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Backup failed', e);
+      alert('Failed to generate local backup file.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Full Workspace JSON Backup Restore
+  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      const text = await file.text();
+      const dbData = JSON.parse(text);
+
+      if (!dbData.dashboards || !dbData.widgets) {
+        throw new Error('Invalid backup file schema.');
+      }
+
+      if (confirm('Restoring will overwrite current settings, widgets, notes, and local data with this snapshot. Proceed?')) {
+        await db.transaction('rw', [db.dashboards, db.widgets, db.notes, db.events, db.customTables, db.files], async () => {
+          await db.dashboards.clear();
+          await db.widgets.clear();
+          await db.notes.clear();
+          await db.events.clear();
+          await db.customTables.clear();
+          await db.files.clear();
+
+          await db.dashboards.bulkAdd(dbData.dashboards);
+          await db.widgets.bulkAdd(dbData.widgets);
+          if (dbData.notes) await db.notes.bulkAdd(dbData.notes);
+          if (dbData.events) await db.events.bulkAdd(dbData.events);
+          if (dbData.tables) await db.customTables.bulkAdd(dbData.tables);
+          
+          if (dbData.files) {
+            const reconstructedFiles = dbData.files.map((f: any) => {
+              const byteString = atob(f.blobBase64.split(',')[1]);
+              const mimeString = f.blobBase64.split(',')[0].split(':')[1].split(';')[0];
+              const ab = new ArrayBuffer(byteString.length);
+              const ia = new Uint8Array(ab);
+              for (let i = 0; i < byteString.length; i++) {
+                ia[i] = byteString.charCodeAt(i);
+              }
+              const blob = new Blob([ab], { type: mimeString });
+              
+              const { blobBase64: _blobBase64, ...rest } = f;
+              return { ...rest, blob };
+            });
+            await db.files.bulkAdd(reconstructedFiles);
+          }
+        });
+
+        alert('Backup restored successfully. Reloading OS...');
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Import failed', err);
+      alert('Failed to restore backup. Please ensure the file is a valid Personal OS backup JSON.');
+    } finally {
+      setIsImporting(false);
+      if (backupFileInputRef.current) {
+        backupFileInputRef.current.value = '';
+      }
     }
   };
 
@@ -151,12 +256,23 @@ export const SettingsModal: React.FC = () => {
               </div>
             </div>
 
-            <button
-              onClick={() => setSettingsOpen(false)}
-              className="p-1.5 rounded-lg text-muted-text hover:text-primary-text hover:bg-white/5 transition-colors cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportBackup}
+                disabled={isExporting}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-cyan-accent/10 border border-cyan-accent/30 text-cyan-accent hover:bg-cyan-accent/20 transition-colors cursor-pointer text-xs font-mono"
+                title="Export OS Snapshot (JSON)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{isExporting ? 'Exporting...' : 'Backup'}</span>
+              </button>
+              <button
+                onClick={() => setSettingsOpen(false)}
+                className="p-1.5 rounded-lg text-muted-text hover:text-primary-text hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Navigation Tabs */}
@@ -203,7 +319,7 @@ export const SettingsModal: React.FC = () => {
               }`}
             >
               <Database className="w-3.5 h-3.5" />
-              <span>Telemetry</span>
+              <span>Backup & Data</span>
             </button>
           </div>
 
@@ -509,6 +625,52 @@ export const SettingsModal: React.FC = () => {
             {/* 4. TELEMETRY & SYSTEM TAB */}
             {activeTab === 'data' && (
               <div className="space-y-6">
+                {/* Backup & Data Snapshot Section */}
+                <div className="p-4 rounded-xl bg-glass-bg border border-color-border-color space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-primary-text flex items-center gap-2">
+                        <Download className="w-4 h-4 text-cyan-accent" />
+                        Workspace Backup & Snapshot Restore
+                      </h4>
+                      <p className="text-[11px] text-muted-text mt-0.5">
+                        Download an offline JSON snapshot of all workspaces, widgets, notes, and uploaded media, or restore an existing backup file.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <button
+                      onClick={handleExportBackup}
+                      disabled={isExporting}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-accent/10 border border-cyan-accent/30 hover:border-cyan-accent hover:bg-cyan-accent/20 text-cyan-accent text-xs font-mono font-bold transition-all cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>{isExporting ? 'Packaging Snapshot...' : 'Export OS Backup (JSON)'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => backupFileInputRef.current?.click()}
+                      disabled={isImporting}
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-accent/10 border border-purple-accent/30 hover:border-purple-accent hover:bg-purple-accent/20 text-purple-accent text-xs font-mono font-bold transition-all cursor-pointer"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span>{isImporting ? 'Restoring DB...' : 'Restore Backup File'}</span>
+                    </button>
+
+                    <input
+                      type="file"
+                      ref={backupFileInputRef}
+                      onChange={handleImportBackup}
+                      accept=".json"
+                      className="hidden"
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-text font-mono">
+                    * Backups are local-first, offline, and stored securely in your browser's IndexedDB.
+                  </p>
+                </div>
+
                 <div>
                   <h3 className="text-sm font-bold text-primary-text mb-1">System State & Mission Telemetry</h3>
                   <p className="text-xs text-muted-text">

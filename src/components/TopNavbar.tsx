@@ -1,19 +1,13 @@
 import React, { useState, useRef } from 'react';
 import { useDashboardStore } from '../stores/useDashboardStore';
 import { useWidgetStore } from '../stores/useWidgetStore';
-import { useThemeStore } from '../stores/useThemeStore';
 import { useLayoutStore } from '../stores/useLayoutStore';
 import { useSearchStore } from '../stores/useSearchStore';
 import { useClipboardStore } from '../stores/useClipboardStore';
-import { useSettingsStore } from '../stores/useSettingsStore';
-import { useHistoryStore } from '../stores/useHistoryStore';
 import { db } from '../core/storage/db';
 import { 
   Search, 
-  Sun, 
-  Moon, 
   Plus, 
-  Download, 
   Upload, 
   RefreshCw,
   FolderOpen,
@@ -31,27 +25,18 @@ import {
   Film,
   Music,
   Type,
-  Wallpaper,
-  Terminal,
-  Settings,
-  Undo2,
-  Redo2
+  Wallpaper
 } from 'lucide-react';
 
 export const TopNavbar: React.FC = () => {
   const { dashboards, activeDashboardId, updateDashboard } = useDashboardStore();
   const { addWidget, widgets } = useWidgetStore();
-  const { theme, toggleTheme } = useThemeStore();
   const { zoom, resetCanvas } = useLayoutStore();
   const { setOpen: setSearchOpen } = useSearchStore();
   const { copiedWidget, pasteWidget } = useClipboardStore();
-  const { setSettingsOpen, setCliOpen } = useSettingsStore();
-  const { undo, redo, undoStack, redoStack } = useHistoryStore();
 
   const [showAddMenu, setShowAddMenu] = useState(false);
-  const [showBackupMenu, setShowBackupMenu] = useState(false);
   const [showBgMenu, setShowBgMenu] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const bgInputRef = useRef<HTMLInputElement>(null);
 
   const activeDashboard = dashboards.find(d => d.id === activeDashboardId);
@@ -119,102 +104,6 @@ export const TopNavbar: React.FC = () => {
     });
 
     setShowAddMenu(false);
-  };
-
-  // Full Workspace JSON Backup
-  const handleExportBackup = async () => {
-    try {
-      const dbData = {
-        dashboards: await db.dashboards.toArray(),
-        widgets: await db.widgets.toArray(),
-        notes: await db.notes.toArray(),
-        events: await db.events.toArray(),
-        tables: await db.customTables.toArray(),
-        // Exclude files due to potential size, or parse smaller ones. 
-        // For a full backup, we convert files into base64 or arraybuffer objects.
-        files: await Promise.all((await db.files.toArray()).map(async f => ({
-          ...f,
-          blobBase64: await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(f.blob);
-          })
-        })))
-      };
-
-      const json = JSON.stringify(dbData, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `personal_os_backup_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      setShowBackupMenu(false);
-    } catch (e) {
-      console.error('Backup failed', e);
-      alert('Failed to generate local backup file.');
-    }
-  };
-
-  // Restore Backup
-  const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const dbData = JSON.parse(text);
-
-      if (!dbData.dashboards || !dbData.widgets) {
-        throw new Error('Invalid backup file schema.');
-      }
-
-      if (confirm('Restoring will clear all current settings, widgets, notes, and files. Proceed?')) {
-        await db.transaction('rw', [db.dashboards, db.widgets, db.notes, db.events, db.customTables, db.files], async () => {
-          await db.dashboards.clear();
-          await db.widgets.clear();
-          await db.notes.clear();
-          await db.events.clear();
-          await db.customTables.clear();
-          await db.files.clear();
-
-          await db.dashboards.bulkAdd(dbData.dashboards);
-          await db.widgets.bulkAdd(dbData.widgets);
-          if (dbData.notes) await db.notes.bulkAdd(dbData.notes);
-          if (dbData.events) await db.events.bulkAdd(dbData.events);
-          if (dbData.tables) await db.customTables.bulkAdd(dbData.tables);
-          
-          if (dbData.files) {
-            const reconstructedFiles = dbData.files.map((f: any) => {
-              // Convert Base64 back to Blob
-              const byteString = atob(f.blobBase64.split(',')[1]);
-              const mimeString = f.blobBase64.split(',')[0].split(':')[1].split(';')[0];
-              const ab = new ArrayBuffer(byteString.length);
-              const ia = new Uint8Array(ab);
-              for (let i = 0; i < byteString.length; i++) {
-                ia[i] = byteString.charCodeAt(i);
-              }
-              const blob = new Blob([ab], { type: mimeString });
-              
-              const { blobBase64, ...rest } = f;
-              return { ...rest, blob };
-            });
-            await db.files.bulkAdd(reconstructedFiles);
-          }
-        });
-
-        alert('Backup restored successfully. Reloading OS...');
-        window.location.reload();
-      }
-    } catch (err) {
-      console.error('Import failed', err);
-      alert('Failed to restore backup. Please ensure the file is a valid Personal OS backup JSON.');
-    }
   };
 
   const handleBackgroundUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -320,7 +209,6 @@ export const TopNavbar: React.FC = () => {
               onClick={() => {
                 setShowBgMenu(!showBgMenu);
                 setShowAddMenu(false);
-                setShowBackupMenu(false);
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-color-border-color text-xs transition-colors cursor-pointer ${
                 showBgMenu ? 'bg-cyan-accent text-black' : 'bg-glass-bg text-secondary-text hover:border-cyan-accent hover:text-primary-text'
@@ -372,58 +260,10 @@ export const TopNavbar: React.FC = () => {
           </button>
         )}
 
-        {/* Undo and Redo Button Group */}
-        <div className="flex items-center gap-1 p-0.5 rounded-xl bg-glass-bg border border-color-border-color shadow-sm">
-          <button
-            onClick={() => activeDashboardId && undo(activeDashboardId)}
-            disabled={undoStack.length === 0}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              undoStack.length > 0
-                ? 'text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-95'
-                : 'text-muted-text/30 cursor-not-allowed opacity-50'
-            }`}
-            title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` • ${undoStack.length} action${undoStack.length > 1 ? 's' : ''}` : ''}`}
-            aria-label="Undo action"
-          >
-            <Undo2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Undo</span>
-            {undoStack.length > 0 && (
-              <span className="text-[10px] font-mono px-1 rounded bg-cyan-accent/20 text-cyan-accent leading-tight hidden xl:inline">
-                {undoStack.length}
-              </span>
-            )}
-          </button>
-
-          <div className="w-[1px] h-4 bg-color-border-color" />
-
-          <button
-            onClick={() => activeDashboardId && redo(activeDashboardId)}
-            disabled={redoStack.length === 0}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              redoStack.length > 0
-                ? 'text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-95'
-                : 'text-muted-text/30 cursor-not-allowed opacity-50'
-            }`}
-            title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` • ${redoStack.length} action${redoStack.length > 1 ? 's' : ''}` : ''}`}
-            aria-label="Redo action"
-          >
-            <Redo2 className="w-4 h-4" />
-            <span className="hidden sm:inline">Redo</span>
-            {redoStack.length > 0 && (
-              <span className="text-[10px] font-mono px-1 rounded bg-cyan-accent/20 text-cyan-accent leading-tight hidden xl:inline">
-                {redoStack.length}
-              </span>
-            )}
-          </button>
-        </div>
-
         {/* Add Widget Dropdown */}
         <div className="relative">
           <button
-            onClick={() => {
-              setShowAddMenu(!showAddMenu);
-              setShowBackupMenu(false);
-            }}
+            onClick={() => setShowAddMenu(!showAddMenu)}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-colors ${
               showAddMenu 
                 ? 'bg-cyan-accent text-black' 
@@ -457,79 +297,6 @@ export const TopNavbar: React.FC = () => {
             </div>
           )}
         </div>
-
-
-
-        {/* System Settings & Backups */}
-        <div className="relative">
-          <button
-            onClick={() => {
-              setShowBackupMenu(!showBackupMenu);
-              setShowAddMenu(false);
-            }}
-            className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-secondary-text hover:text-primary-text hover:border-cyan-accent cursor-pointer transition-colors"
-            title="System Diagnostics & Backups"
-          >
-            <Download className="w-4 h-4" />
-          </button>
-
-          {showBackupMenu && (
-            <div className="absolute right-0 mt-2 w-48 glass-panel rounded-2xl p-2 shadow-lg border border-color-border-color z-40 animate-[fadeIn_0.15s_ease-out]">
-              <div className="px-3 py-1.5 border-b border-color-border-color mb-1.5">
-                <span className="text-[10px] uppercase font-bold text-muted-text tracking-wider">System State</span>
-              </div>
-              <button
-                onClick={handleExportBackup}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs text-secondary-text hover:text-primary-text hover:bg-glass-bg transition-colors cursor-pointer"
-              >
-                <Download className="w-4 h-4 text-cyan-accent" />
-                <span>Export OS Snapshot</span>
-              </button>
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs text-secondary-text hover:text-primary-text hover:bg-glass-bg transition-colors cursor-pointer"
-              >
-                <Upload className="w-4 h-4 text-purple-accent" />
-                <span>Restore Backup</span>
-              </button>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleImportBackup}
-                accept=".json"
-                className="hidden"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* CLI Control Room Button */}
-        <button
-          onClick={() => setCliOpen(true)}
-          className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-cyan-accent hover:border-cyan-accent hover:bg-cyan-accent/10 cursor-pointer transition-all flex items-center gap-1.5"
-          title="CLI Command Control Room (Ctrl+~)"
-        >
-          <Terminal className="w-4 h-4" />
-          <span className="hidden md:inline text-xs font-mono font-bold">CLI</span>
-        </button>
-
-        {/* System Settings Button */}
-        <button
-          onClick={() => setSettingsOpen(true)}
-          className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-secondary-text hover:text-primary-text hover:border-cyan-accent cursor-pointer transition-colors"
-          title="OS Settings"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-
-        {/* Theme Switcher */}
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-secondary-text hover:text-primary-text hover:border-cyan-accent cursor-pointer transition-colors"
-          title={`Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Theme`}
-        >
-          {theme === 'dark' ? <Sun className="w-4 h-4 text-cyan-accent" /> : <Moon className="w-4 h-4 text-purple-accent" />}
-        </button>
 
       </div>
     </div>
