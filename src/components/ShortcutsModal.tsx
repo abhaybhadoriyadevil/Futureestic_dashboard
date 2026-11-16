@@ -7,7 +7,9 @@ export const ShortcutsModal: React.FC = () => {
   const { isShortcutsOpen, setShortcutsOpen } = useUIStore();
 
   const shortcuts = [
+    { keys: ['Esc'], desc: 'Exit Fullscreen / Close Modal' },
     { keys: ['Ctrl / Cmd', 'K'], desc: 'Universal Search / Command Palette' },
+    { keys: ['Ctrl / Cmd', '`'], desc: 'CLI Command Control Room' },
     { keys: ['Ctrl / Cmd', 'Z'], desc: 'Undo Layout Change' },
     { keys: ['Ctrl / Cmd', 'Y'], desc: 'Redo Layout Change' },
     { keys: ['Ctrl / Cmd', 'C'], desc: 'Copy Selected Widget' },

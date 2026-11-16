@@ -19,6 +19,7 @@ export const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({ widgetId, sh
 
   // Custom KPI configurations
   const [metricType, setMetricType] = useState<'system' | 'custom' | 'habits'>('system');
+  const [selectedHabitWidgetId, setSelectedHabitWidgetId] = useState<string>('all');
   const [customTitle, setCustomTitle] = useState('Workspace Goal');
   const [customValue, setCustomValue] = useState(12);
   const [customMax, setCustomMax] = useState(20);
@@ -31,6 +32,7 @@ export const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({ widgetId, sh
       try {
         const parsed = JSON.parse(saved);
         setMetricType(parsed.metricType || 'system');
+        setSelectedHabitWidgetId(parsed.selectedHabitWidgetId || 'all');
         setCustomTitle(parsed.customTitle || 'Workspace Goal');
         setCustomValue(parsed.customValue ?? 12);
         setCustomMax(parsed.customMax ?? 20);
@@ -49,7 +51,7 @@ export const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({ widgetId, sh
   const saveSettings = () => {
     localStorage.setItem(
       `widget-stats-${widgetId}`,
-      JSON.stringify({ metricType, customTitle, customValue, customMax })
+      JSON.stringify({ metricType, selectedHabitWidgetId, customTitle, customValue, customMax })
     );
     setShowConfig(false);
   };
@@ -61,8 +63,14 @@ export const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({ widgetId, sh
       
       {/* Top Header Controls */}
       <div className="flex justify-between items-center mb-3">
-        <span className="text-[10px] uppercase font-bold text-muted-text tracking-widest">
-          {metricType === 'system' ? 'System Diagnostics' : metricType === 'habits' ? 'Habits Overview' : 'Goal Tracker'}
+        <span className="text-[10px] uppercase font-bold text-muted-text tracking-widest truncate max-w-[200px]">
+          {metricType === 'system'
+            ? 'System Diagnostics'
+            : metricType === 'habits'
+            ? selectedHabitWidgetId !== 'all'
+              ? `Habits (${habitWidgets.find(w => w.id === selectedHabitWidgetId)?.title || 'Selected Tracker'})`
+              : 'Habits Overview'
+            : 'Goal Tracker'}
         </span>
         {showControls && (
           <button
@@ -97,6 +105,24 @@ export const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({ widgetId, sh
                 <option value="habits">Habit Tracking Stats</option>
               </select>
             </div>
+
+            {metricType === 'habits' && habitWidgets.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <label className="text-[9px] text-muted-text font-semibold uppercase">Habit Tracker Source</label>
+                <select
+                  value={selectedHabitWidgetId}
+                  onChange={(e) => setSelectedHabitWidgetId(e.target.value)}
+                  className="px-2 py-1 rounded bg-secondary-bg border border-color-border-color text-xs focus:outline-none text-primary-text"
+                >
+                  <option value="all">All Habit Trackers (Combined)</option>
+                  {habitWidgets.map((hw, idx) => (
+                    <option key={hw.id} value={hw.id}>
+                      {hw.title || `Habit Tracker ${idx + 1}`} (Widget {idx + 1})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {metricType === 'custom' && (
               <>
@@ -173,13 +199,17 @@ export const StatisticsWidget: React.FC<StatisticsWidgetProps> = ({ widgetId, sh
             let totalHabits = 0;
             let totalCheckins = 0;
 
-            habitWidgets.forEach(w => {
+            const targetWidgets = selectedHabitWidgetId === 'all'
+              ? habitWidgets
+              : habitWidgets.filter(w => w.id === selectedHabitWidgetId);
+
+            targetWidgets.forEach(w => {
               try {
                 const parsed = JSON.parse(w.dataRef || '{}');
                 if (parsed.habits) {
                   parsed.habits.forEach((h: any) => {
                     totalHabits++;
-                    totalCheckins += Object.values(h.history).filter(v => v).length;
+                    totalCheckins += Object.values(h.history || {}).filter(v => v).length;
                   });
                 }
               } catch (e) {}

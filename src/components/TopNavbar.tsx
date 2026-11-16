@@ -5,6 +5,8 @@ import { useThemeStore } from '../stores/useThemeStore';
 import { useLayoutStore } from '../stores/useLayoutStore';
 import { useSearchStore } from '../stores/useSearchStore';
 import { useClipboardStore } from '../stores/useClipboardStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
+import { useHistoryStore } from '../stores/useHistoryStore';
 import { db } from '../core/storage/db';
 import { 
   Search, 
@@ -29,7 +31,11 @@ import {
   Film,
   Music,
   Type,
-  Wallpaper
+  Wallpaper,
+  Terminal,
+  Settings,
+  Undo2,
+  Redo2
 } from 'lucide-react';
 
 export const TopNavbar: React.FC = () => {
@@ -39,6 +45,8 @@ export const TopNavbar: React.FC = () => {
   const { zoom, resetCanvas } = useLayoutStore();
   const { setOpen: setSearchOpen } = useSearchStore();
   const { copiedWidget, pasteWidget } = useClipboardStore();
+  const { setSettingsOpen, setCliOpen } = useSettingsStore();
+  const { undo, redo, undoStack, redoStack } = useHistoryStore();
 
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showBackupMenu, setShowBackupMenu] = useState(false);
@@ -84,16 +92,20 @@ export const TopNavbar: React.FC = () => {
 
     // Create custom configuration inside dataRef if appropriate
     let dataRef = undefined;
+    let finalTitle = title;
     if (moduleType === 'kanban') {
       dataRef = JSON.stringify({ todo: [], progress: [], done: [] });
     } else if (moduleType === 'mindmap') {
       dataRef = JSON.stringify({ nodes: [{ id: 'n-1', label: 'Idea', x: 200, y: 150, color: '#3b82f6' }], connections: [] });
+    } else if (moduleType === 'habits') {
+      const habitCount = widgets.filter(w => w.moduleType === 'habits').length;
+      finalTitle = habitCount > 0 ? `Habit Tracker ${habitCount + 1}` : 'Habit Tracker';
     }
 
     await addWidget({
       dashboardId: activeDashboardId,
       moduleType,
-      title,
+      title: finalTitle,
       position,
       size,
       rotation: 0,
@@ -360,6 +372,51 @@ export const TopNavbar: React.FC = () => {
           </button>
         )}
 
+        {/* Undo and Redo Button Group */}
+        <div className="flex items-center gap-1 p-0.5 rounded-xl bg-glass-bg border border-color-border-color shadow-sm">
+          <button
+            onClick={() => activeDashboardId && undo(activeDashboardId)}
+            disabled={undoStack.length === 0}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              undoStack.length > 0
+                ? 'text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-95'
+                : 'text-muted-text/30 cursor-not-allowed opacity-50'
+            }`}
+            title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` • ${undoStack.length} action${undoStack.length > 1 ? 's' : ''}` : ''}`}
+            aria-label="Undo action"
+          >
+            <Undo2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Undo</span>
+            {undoStack.length > 0 && (
+              <span className="text-[10px] font-mono px-1 rounded bg-cyan-accent/20 text-cyan-accent leading-tight hidden xl:inline">
+                {undoStack.length}
+              </span>
+            )}
+          </button>
+
+          <div className="w-[1px] h-4 bg-color-border-color" />
+
+          <button
+            onClick={() => activeDashboardId && redo(activeDashboardId)}
+            disabled={redoStack.length === 0}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              redoStack.length > 0
+                ? 'text-primary-text hover:text-cyan-accent hover:bg-cyan-accent/10 cursor-pointer active:scale-95'
+                : 'text-muted-text/30 cursor-not-allowed opacity-50'
+            }`}
+            title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` • ${redoStack.length} action${redoStack.length > 1 ? 's' : ''}` : ''}`}
+            aria-label="Redo action"
+          >
+            <Redo2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Redo</span>
+            {redoStack.length > 0 && (
+              <span className="text-[10px] font-mono px-1 rounded bg-cyan-accent/20 text-cyan-accent leading-tight hidden xl:inline">
+                {redoStack.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {/* Add Widget Dropdown */}
         <div className="relative">
           <button
@@ -445,6 +502,25 @@ export const TopNavbar: React.FC = () => {
             </div>
           )}
         </div>
+
+        {/* CLI Control Room Button */}
+        <button
+          onClick={() => setCliOpen(true)}
+          className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-cyan-accent hover:border-cyan-accent hover:bg-cyan-accent/10 cursor-pointer transition-all flex items-center gap-1.5"
+          title="CLI Command Control Room (Ctrl+~)"
+        >
+          <Terminal className="w-4 h-4" />
+          <span className="hidden md:inline text-xs font-mono font-bold">CLI</span>
+        </button>
+
+        {/* System Settings Button */}
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-secondary-text hover:text-primary-text hover:border-cyan-accent cursor-pointer transition-colors"
+          title="OS Settings"
+        >
+          <Settings className="w-4 h-4" />
+        </button>
 
         {/* Theme Switcher */}
         <button

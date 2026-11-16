@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useDashboardStore } from '../stores/useDashboardStore';
 import { useThemeStore } from '../stores/useThemeStore';
 import { useUIStore } from '../stores/useUIStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import { 
   Home, 
   Briefcase, 
@@ -12,13 +13,16 @@ import {
   Trash2, 
   ChevronLeft, 
   ChevronRight, 
-  Layout
+  Layout,
+  Settings,
+  Terminal
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const { dashboards, activeDashboardId, setActiveDashboardId, deleteDashboard } = useDashboardStore();
   const { theme } = useThemeStore();
   const { setCreateWorkspaceModal } = useUIStore();
+  const { osName, userName, userRole, userAvatar, setSettingsOpen, setCliOpen } = useSettingsStore();
   
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [editingDashId, setEditingDashId] = useState<string | null>(null);
@@ -52,21 +56,29 @@ export const Sidebar: React.FC = () => {
       {/* Brand Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-color-border-color">
         {!isCollapsed && (
-          <div className="flex items-center gap-2">
-            <span className="font-extrabold text-lg tracking-wider bg-gradient-to-r from-blue-accent via-cyan-accent to-purple-accent bg-clip-text text-transparent">
-              PERSONAL OS
+          <button 
+            onClick={() => setSettingsOpen(true)}
+            className="flex items-center gap-2 cursor-pointer text-left group"
+            title="Configure OS System Settings"
+          >
+            <span className="font-extrabold text-base tracking-wider bg-gradient-to-r from-blue-accent via-cyan-accent to-purple-accent bg-clip-text text-transparent truncate max-w-[160px]">
+              {osName}
             </span>
-            <span className="w-2 h-2 rounded-full bg-cyan-accent animate-pulse" />
-          </div>
+            <span className="w-2 h-2 rounded-full bg-cyan-accent animate-pulse shrink-0" />
+          </button>
         )}
         {isCollapsed && (
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-tr from-blue-accent to-purple-accent text-white font-bold text-sm mx-auto">
-            OS
-          </div>
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-tr from-blue-accent to-purple-accent text-white font-bold text-xs mx-auto cursor-pointer"
+            title="Settings"
+          >
+            {osName.slice(0, 2).toUpperCase()}
+          </button>
         )}
         <button 
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute -right-3 top-6 w-6 h-6 rounded-full glass-panel border border-color-border-color flex items-center justify-center hover:bg-glass-bg cursor-pointer text-primary-text"
+          className="absolute -right-3 top-6 w-6 h-6 rounded-full glass-panel border border-color-border-color flex items-center justify-center hover:bg-glass-bg cursor-pointer text-primary-text z-30"
         >
           {isCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
         </button>
@@ -154,24 +166,79 @@ export const Sidebar: React.FC = () => {
         })}
       </div>
 
-      {/* Add Workspace Footer */}
-      <div className="p-3 border-t border-color-border-color">
+      {/* Add Workspace Button */}
+      <div className="p-2.5 border-t border-color-border-color">
         {isCollapsed ? (
           <button 
             onClick={() => setCreateWorkspaceModal(true)}
             className="w-10 h-10 rounded-xl bg-glass-bg border border-color-border-color flex items-center justify-center hover:border-cyan-accent cursor-pointer hover:bg-cyan-accent/5 transition-colors mx-auto text-primary-text"
+            title="Create Space"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
           </button>
         ) : (
           <button
             onClick={() => setCreateWorkspaceModal(true)}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent hover:bg-cyan-accent/5 cursor-pointer text-sm font-medium transition-all text-primary-text"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent hover:bg-cyan-accent/5 cursor-pointer text-xs font-medium transition-all text-primary-text"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="w-3.5 h-3.5" />
             <span>Create Space</span>
           </button>
         )}
+      </div>
+
+      {/* User Profile & Quick Access Bar */}
+      <div className="p-2 border-t border-color-border-color bg-glass-bg/40">
+        <div className={`flex items-center ${isCollapsed ? 'flex-col gap-2 justify-center' : 'justify-between'} p-1.5 rounded-xl bg-primary-bg/50 border border-color-border-color`}>
+          {/* User Profile trigger */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className={`flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'truncate'} text-left cursor-pointer group flex-1 min-w-0`}
+            title="User Profile & Settings"
+          >
+            <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-cyan-accent/60 shadow-[0_0_8px_rgba(6,182,212,0.3)] shrink-0 flex items-center justify-center bg-secondary-bg">
+              {userAvatar ? (
+                <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+              ) : (
+                <span className="font-mono text-xs font-bold text-cyan-accent">
+                  {userName.charAt(0).toUpperCase()}
+                </span>
+              )}
+              <span className="absolute bottom-0 right-0 w-1.5 h-1.5 rounded-full bg-emerald-400 ring-1 ring-black" />
+            </div>
+
+            {!isCollapsed && (
+              <div className="truncate flex-1 min-w-0">
+                <div className="text-xs font-semibold text-primary-text truncate group-hover:text-cyan-accent transition-colors">
+                  {userName}
+                </div>
+                <div className="text-[10px] text-muted-text truncate font-mono">
+                  {userRole}
+                </div>
+              </div>
+            )}
+          </button>
+
+          {/* Action buttons */}
+          <div className={`flex items-center gap-1 shrink-0 ${isCollapsed ? 'w-full justify-center' : ''}`}>
+            {/* CLI Control Room Button */}
+            <button
+              onClick={() => setCliOpen(true)}
+              className="p-1.5 rounded-lg text-secondary-text hover:text-cyan-accent hover:bg-cyan-accent/10 border border-transparent hover:border-cyan-accent/30 cursor-pointer transition-all"
+              title="CLI Command Control Room (` or ~)"
+            >
+              <Terminal className="w-3.5 h-3.5" />
+            </button>
+            {/* Settings Button */}
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="p-1.5 rounded-lg text-secondary-text hover:text-cyan-accent hover:bg-cyan-accent/10 border border-transparent hover:border-cyan-accent/30 cursor-pointer transition-all"
+              title="System Settings"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
       </div>
 
 

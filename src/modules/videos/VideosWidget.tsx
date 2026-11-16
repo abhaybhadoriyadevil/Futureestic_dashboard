@@ -14,7 +14,8 @@ import {
   Video, 
   List, 
   ChevronRight,
-  Tv
+  Tv,
+  Trash2,
 } from 'lucide-react';
 
 interface VideosWidgetProps {
@@ -167,6 +168,25 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
     }
   };
 
+  const handleDeleteVideo = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await db.files.delete(id);
+      const newFileIds = fileIds.filter(fId => fId !== id);
+      const nextActive = id === activeVideoId ? (newFileIds[0] || null) : activeVideoId;
+      await commitWidgetUpdate(widgetId, {
+        dataRef: JSON.stringify({ fileIds: newFileIds, activeVideoId: nextActive, showPlaylist })
+      });
+      if (id === activeVideoId) {
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setActiveVideoId(nextActive);
+      }
+    } catch (err) {
+      console.error('Failed to delete video', err);
+    }
+  };
+
   const formatTime = (time: number) => {
     const mins = Math.floor(time / 60);
     const secs = Math.floor(time % 60);
@@ -222,6 +242,15 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
                 </div>
 
                 <div className="flex items-center gap-2">
+                  {activeVideo && (
+                    <button
+                      onClick={(e) => handleDeleteVideo(activeVideo.id, e)}
+                      className="text-white/70 hover:text-red-400 p-1 rounded hover:bg-white/10 transition-colors cursor-pointer mr-0.5"
+                      title="Delete Video"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                   {showControls && (
                     <label className="text-white hover:text-cyan-accent cursor-pointer mr-1" title="Upload Video">
                       <Upload className="w-4 h-4" />
@@ -285,7 +314,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
             {videos.map(v => {
               const isActive = v.id === activeVideoId;
               return (
-                <button
+                <div
                   key={v.id}
                   onClick={async () => {
                     setActiveVideoId(v.id);
@@ -294,18 +323,27 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
                       dataRef: JSON.stringify({ fileIds, activeVideoId: v.id, showPlaylist })
                     });
                   }}
-                  className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex justify-between items-center cursor-pointer ${
+                  className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex justify-between items-center cursor-pointer group/vitem ${
                     isActive 
                       ? 'border-cyan-accent/30 bg-cyan-accent/5 text-cyan-accent' 
                       : 'border-color-border-color bg-glass-bg/40 text-secondary-text hover:text-primary-text hover:bg-glass-bg'
                   }`}
                 >
-                  <div className="flex items-center gap-2 truncate max-w-[85%]">
+                  <div className="flex items-center gap-2 truncate max-w-[75%]">
                     <Video className="w-3.5 h-3.5 flex-shrink-0" />
                     <span className="truncate">{v.name}</span>
                   </div>
-                  <ChevronRight className="w-3 h-3 flex-shrink-0" />
-                </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={(e) => handleDeleteVideo(v.id, e)}
+                      className="p-1 rounded text-muted-text hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/vitem:opacity-100 transition-all cursor-pointer"
+                      title="Delete video"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                    <ChevronRight className="w-3 h-3 flex-shrink-0" />
+                  </div>
+                </div>
               );
             })}
           </div>

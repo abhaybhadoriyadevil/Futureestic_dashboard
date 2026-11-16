@@ -11,6 +11,9 @@ import { QuickNoteModal } from './components/QuickNoteModal';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ToastContainer } from './components/ToastContainer';
 import { CreateWorkspaceModal } from './components/CreateWorkspaceModal';
+import { SettingsModal } from './components/SettingsModal';
+import { Terminal as CliTerminal } from './cli/components/Terminal';
+import { useSettingsStore } from './stores/useSettingsStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 // Boot sequence lines
@@ -151,6 +154,7 @@ function App() {
     };
     setupDatabase();
     initTheme();
+    useSettingsStore.getState().initSettings();
   }, [initTheme]);
 
   useEffect(() => {
@@ -197,6 +201,8 @@ function App() {
           <QuickNoteModal />
           <ShortcutsModal />
           <CreateWorkspaceModal />
+          <SettingsModal />
+          <CliTerminal />
           <ToastContainer />
         </motion.div>
       )}

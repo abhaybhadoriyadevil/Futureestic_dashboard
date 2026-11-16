@@ -19,7 +19,11 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
   pushState: (widgets) => {
     // Clone widgets array to capture snapshot before edits
-    const snapshot = JSON.parse(JSON.stringify(widgets));
+    const snapshot: Widget[] = JSON.parse(JSON.stringify(widgets));
+    const currentTop = get().undoStack[get().undoStack.length - 1];
+    if (currentTop && JSON.stringify(currentTop) === JSON.stringify(snapshot)) {
+      return; // Skip duplicate identical snapshots
+    }
     set((state) => ({
       undoStack: [...state.undoStack.slice(-49), snapshot], // Limit history to 50 operations
       redoStack: [], // Clear redo stack on a new user action
@@ -47,10 +51,13 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     try {
       // Sync back to IndexedDB: remove existing widgets for this dashboard, bulk add the previous ones
       await db.widgets.where('dashboardId').equals(dashboardId).delete();
-      await db.widgets.bulkAdd(previousState);
+      const toRestore = (previousState || []).filter(w => !w.dashboardId || w.dashboardId === dashboardId);
+      if (toRestore.length > 0) {
+        await db.widgets.bulkAdd(toRestore);
+      }
 
       // Apply update directly to the widget store
-      useWidgetStore.setState({ widgets: previousState });
+      useWidgetStore.setState({ widgets: toRestore });
       useUIStore.getState().addToast('Action undone', 'info');
     } catch (e) {
       console.error('History undo transaction failed', e);
@@ -79,10 +86,13 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     try {
       // Sync back to IndexedDB
       await db.widgets.where('dashboardId').equals(dashboardId).delete();
-      await db.widgets.bulkAdd(nextState);
+      const toRestore = (nextState || []).filter(w => !w.dashboardId || w.dashboardId === dashboardId);
+      if (toRestore.length > 0) {
+        await db.widgets.bulkAdd(toRestore);
+      }
 
       // Apply update directly to the widget store
-      useWidgetStore.setState({ widgets: nextState });
+      useWidgetStore.setState({ widgets: toRestore });
       useUIStore.getState().addToast('Action redone', 'info');
     } catch (e) {
       console.error('History redo transaction failed', e);

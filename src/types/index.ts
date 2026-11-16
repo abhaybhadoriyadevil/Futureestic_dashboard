@@ -3,15 +3,28 @@ export interface Dashboard {
   name: string;
   icon: string;
   description: string;
-  layoutType: 'free' | 'snap' | 'canvas';
+  layoutType: "free" | "snap" | "canvas";
   themeId: string;
-  backgroundType?: 'theme' | 'image' | 'video';
+  backgroundType?: "theme" | "image" | "video";
   backgroundFileId?: string;
   createdAt: number;
   updatedAt: number;
 }
 
-export type WidgetModuleType = 'files' | 'images' | 'videos' | 'audio' | 'notes' | 'tables' | 'calendar' | 'charts' | 'statistics' | 'kanban' | 'mindmap' | 'habits' | 'text';
+export type WidgetModuleType =
+  | "files"
+  | "images"
+  | "videos"
+  | "audio"
+  | "notes"
+  | "tables"
+  | "calendar"
+  | "charts"
+  | "statistics"
+  | "kanban"
+  | "mindmap"
+  | "habits"
+  | "text";
 
 export interface Widget {
   id: string;
@@ -20,12 +33,13 @@ export interface Widget {
   title: string;
   position: { x: number; y: number };
   size: { w: number; h: number };
+  percentPosition?: { x: number; y: number; w: number; h: number }; // Responsive percentage coordinates (0-100)
   rotation: number;
   zIndex: number;
   opacity: number;
   styles: {
     borderRadius?: string;
-    backgroundType?: 'solid' | 'gradient' | 'image' | 'glass';
+    backgroundType?: "solid" | "gradient" | "image" | "glass";
     backgroundValue?: string;
     borderWidth?: string;
     borderColor?: string;
@@ -35,10 +49,18 @@ export interface Widget {
     padding?: string;
   };
   animation: {
-    entrance?: 'fade' | 'slide-up' | 'slide-down' | 'slide-left' | 'slide-right' | 'scale' | 'zoom' | 'rotate';
-    hover?: 'glow' | 'scale' | 'ripple' | 'floating' | 'pulse' | 'none';
-    exit?: 'fade-out' | 'slide-out' | 'shrink' | 'collapse';
-    trigger?: 'load' | 'hover' | 'click' | 'update';
+    entrance?:
+      | "fade"
+      | "slide-up"
+      | "slide-down"
+      | "slide-left"
+      | "slide-right"
+      | "scale"
+      | "zoom"
+      | "rotate";
+    hover?: "glow" | "scale" | "ripple" | "floating" | "pulse" | "none";
+    exit?: "fade-out" | "slide-out" | "shrink" | "collapse";
+    trigger?: "load" | "hover" | "click" | "update";
   };
   dataRef?: string; // Links to data ID or stores inline config (like custom statistics or Kanban lanes)
   uiState?: Record<string, any>; // Persisted UI preferences (showControls, showPlaylist, etc.)
@@ -47,6 +69,22 @@ export interface Widget {
   minimized?: boolean; // Whether the widget is collapsed to a pill
   preMinimizeSize?: { w: number; h: number }; // Saved size before minimizing, for restore
   createdAt: number;
+}
+
+export interface SavedLayout {
+  id: string;
+  name: string;
+  dashboardId: string;
+  createdAt: number;
+  widgets: Array<{
+    id: string;
+    title: string;
+    moduleType: WidgetModuleType;
+    position: { x: number; y: number };
+    size: { w: number; h: number };
+    percentPosition?: { x: number; y: number; w: number; h: number };
+    zIndex?: number;
+  }>;
 }
 
 export interface FileData {
@@ -74,7 +112,12 @@ export interface Note {
 export interface TableData {
   id: string;
   name: string;
-  columns: { key: string; name: string; type: 'text' | 'number' | 'date' | 'boolean' | 'select'; options?: string[] }[];
+  columns: {
+    key: string;
+    name: string;
+    type: "text" | "number" | "date" | "boolean" | "select";
+    options?: string[];
+  }[];
   rows: Record<string, any>[];
   createdAt: number;
   updatedAt: number;

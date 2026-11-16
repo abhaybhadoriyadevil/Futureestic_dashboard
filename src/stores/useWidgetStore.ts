@@ -7,10 +7,10 @@ interface WidgetState {
   loading: boolean;
   loadWidgets: (dashboardId: string) => Promise<void>;
   updateWidgetLocal: (id: string, updates: Partial<Widget>) => void;
-  commitWidgetUpdate: (id: string, updates: Partial<Widget>) => Promise<void>;
+  commitWidgetUpdate: (id: string, updates: Partial<Widget>, skipHistory?: boolean) => Promise<void>;
   addWidget: (widget: Omit<Widget, 'id' | 'createdAt'>) => Promise<string>;
   duplicateWidget: (id: string) => Promise<string | null>;
-  deleteWidget: (id: string) => Promise<void>;
+  deleteWidget: (id: string, skipHistory?: boolean) => Promise<void>;
   bringToFront: (id: string) => Promise<void>;
   sendToBack: (id: string) => Promise<void>;
 }
@@ -51,14 +51,16 @@ export const useWidgetStore = create<WidgetState>((set, get) => ({
     }));
   },
 
-  commitWidgetUpdate: async (id, updates) => {
+  commitWidgetUpdate: async (id, updates, skipHistory = false) => {
     // Find the widget first to perform a clean merge for deep properties
     const widget = get().widgets.find((w) => w.id === id);
     if (!widget) return;
 
     // Push layout state before modifying
-    const historyStore = (await import('./useHistoryStore')).useHistoryStore;
-    historyStore.getState().pushState(get().widgets);
+    if (!skipHistory) {
+      const historyStore = (await import('./useHistoryStore')).useHistoryStore;
+      historyStore.getState().pushState(get().widgets);
+    }
 
     const merged = {
       ...widget,
@@ -126,10 +128,12 @@ export const useWidgetStore = create<WidgetState>((set, get) => ({
     return newId;
   },
 
-  deleteWidget: async (id) => {
+  deleteWidget: async (id, skipHistory = false) => {
     // Push layout state before modifying
-    const historyStore = (await import('./useHistoryStore')).useHistoryStore;
-    historyStore.getState().pushState(get().widgets);
+    if (!skipHistory) {
+      const historyStore = (await import('./useHistoryStore')).useHistoryStore;
+      historyStore.getState().pushState(get().widgets);
+    }
 
     await db.widgets.delete(id);
     set((state) => ({ widgets: state.widgets.filter((w) => w.id !== id) }));

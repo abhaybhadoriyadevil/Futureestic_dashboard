@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWidgetStore } from '../../stores/useWidgetStore';
-import { Plus, Trash2, Check, X as XIcon, Flame, Clock } from 'lucide-react';
+import { Plus, Trash2, Check, X as XIcon, Flame, Clock, Edit2 } from 'lucide-react';
 
 export type RepeatType = 'everyday' | 'weekdays' | 'weekends' | 'custom';
 
@@ -54,7 +54,8 @@ const formatTime12h = (timeStr?: string) => {
 };
 
 export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
-  const { commitWidgetUpdate } = useWidgetStore();
+  const { commitWidgetUpdate, widgets } = useWidgetStore();
+  const currentWidget = widgets.find(w => w.id === widgetId);
 
   const [habits, setHabits] = useState<Habit[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -62,6 +63,24 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ widgetId, dataRef, s
   const [newTime, setNewTime] = useState('');
   const [newRepeat, setNewRepeat] = useState<RepeatType>('everyday');
   const [newCustomDays, setNewCustomDays] = useState<number[]>([]);
+
+  // Editable widget title state
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState(currentWidget?.title || 'Habit Tracker');
+
+  useEffect(() => {
+    if (currentWidget?.title) {
+      setTitleInput(currentWidget.title);
+    }
+  }, [currentWidget?.title]);
+
+  const handleSaveTitle = async () => {
+    setIsEditingTitle(false);
+    const trimmed = titleInput.trim();
+    if (trimmed && trimmed !== currentWidget?.title) {
+      await commitWidgetUpdate(widgetId, { title: trimmed });
+    }
+  };
 
   useEffect(() => {
     if (dataRef) {
@@ -174,7 +193,51 @@ export const HabitsWidget: React.FC<HabitsWidgetProps> = ({ widgetId, dataRef, s
       {/* Top Header */}
       <div className="flex justify-between items-center mb-4">
         <div className="flex flex-col">
-          <span className="font-bold text-sm tracking-wide">Weekly Routine</span>
+          <div className="flex items-center gap-1.5 group/title">
+            {isEditingTitle ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={titleInput}
+                  onChange={(e) => setTitleInput(e.target.value)}
+                  onBlur={handleSaveTitle}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveTitle();
+                    if (e.key === 'Escape') {
+                      setTitleInput(currentWidget?.title || 'Habit Tracker');
+                      setIsEditingTitle(false);
+                    }
+                  }}
+                  autoFocus
+                  className="font-bold text-sm bg-black/40 border border-cyan-accent rounded px-1.5 py-0.5 text-primary-text outline-none focus:ring-1 focus:ring-cyan-accent"
+                />
+                <button
+                  onClick={handleSaveTitle}
+                  className="p-1 rounded bg-cyan-accent text-black hover:opacity-90 cursor-pointer"
+                  title="Save title"
+                >
+                  <Check className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <>
+                <span 
+                  onClick={() => setIsEditingTitle(true)}
+                  className="font-bold text-sm tracking-wide cursor-pointer hover:text-cyan-accent transition-colors"
+                  title="Click to rename habit tracker"
+                >
+                  {currentWidget?.title || 'Habit Tracker'}
+                </span>
+                <button
+                  onClick={() => setIsEditingTitle(true)}
+                  className="opacity-0 group-hover/title:opacity-100 p-0.5 text-muted-text hover:text-cyan-accent transition-opacity cursor-pointer"
+                  title="Rename"
+                >
+                  <Edit2 className="w-3 h-3" />
+                </button>
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-2 mt-1">
             <span className="text-[10px] text-muted-text uppercase font-semibold">Today's Progress</span>
             <span className="text-cyan-accent font-bold text-xs">{todayCompleted} / {todayHabits.length}</span>

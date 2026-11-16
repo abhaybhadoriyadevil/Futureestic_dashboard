@@ -6,6 +6,7 @@ import { useDashboardStore } from '../stores/useDashboardStore';
 import { useClipboardStore } from '../stores/useClipboardStore';
 import { useSelectionStore } from '../stores/useSelectionStore';
 import { useWidgetStore } from '../stores/useWidgetStore';
+import { useSettingsStore } from '../stores/useSettingsStore';
 
 export const useKeyboardShortcuts = () => {
   useEffect(() => {
@@ -17,6 +18,30 @@ export const useKeyboardShortcuts = () => {
         (e.target as HTMLElement).isContentEditable
       ) {
         return;
+      }
+
+      // Toggle CLI Control Room: Ctrl+` or Ctrl+~
+      if ((e.ctrlKey || e.metaKey) && (e.key === '`' || e.key === '~')) {
+        e.preventDefault();
+        const settingsStore = useSettingsStore.getState();
+        settingsStore.setCliOpen(!settingsStore.isCliOpen);
+      }
+
+      // Open Settings: Ctrl+,
+      if ((e.ctrlKey || e.metaKey) && e.key === ',') {
+        e.preventDefault();
+        const settingsStore = useSettingsStore.getState();
+        settingsStore.setSettingsOpen(!settingsStore.isSettingsOpen);
+      }
+
+      // Exit Fullscreen: Escape
+      if (e.key === 'Escape') {
+        const fullscreenId = useSelectionStore.getState().fullscreenWidgetId;
+        if (fullscreenId) {
+          e.preventDefault();
+          useSelectionStore.getState().setFullscreenWidgetId(null);
+          return;
+        }
       }
 
       // Undo: Ctrl+Z or Cmd+Z

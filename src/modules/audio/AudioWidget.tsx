@@ -12,7 +12,6 @@ import {
   Upload,
   Music,
   List,
-  Disc,
   Repeat,
   Shuffle,
   SkipBack,
@@ -35,10 +34,108 @@ const fmt = (t: number) => {
   return `${m}:${s < 10 ? '0' : ''}${s}`;
 };
 
+// ── Realistic Futuristic Vinyl Record Disc ────────────────
+const VinylRecord: React.FC<{
+  isPlaying: boolean;
+  size: number;
+  onClick?: () => void;
+}> = ({ isPlaying, size, onClick }) => {
+  return (
+    <div
+      onClick={onClick}
+      className={`relative shrink-0 rounded-full cursor-pointer select-none transition-all duration-500 group/vinyl ${
+        isPlaying
+          ? 'shadow-[0_0_25px_rgba(6,182,212,0.45)] ring-1 ring-cyan-accent/40'
+          : 'shadow-[0_0_12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 hover:ring-cyan-accent/30'
+      }`}
+      style={{ width: size, height: size }}
+      title={isPlaying ? 'Click to Pause' : 'Click to Play'}
+    >
+      {/* Vinyl Disc Body with continuous smooth rotation */}
+      <div
+        className="w-full h-full rounded-full relative overflow-hidden flex items-center justify-center border border-white/10"
+        style={{
+          background: `
+            radial-gradient(circle, 
+              #14151f 0%, 
+              #14151f 28%, 
+              #202230 29%, 
+              #111219 32%, 
+              #282a3c 45%, 
+              #161722 47%, 
+              #32354a 60%, 
+              #12131b 62%, 
+              #2c2f42 76%, 
+              #0c0d12 78%, 
+              #222434 92%, 
+              #08080c 100%
+            )
+          `,
+          animation: 'vinylSpin 3.5s linear infinite',
+          animationPlayState: isPlaying ? 'running' : 'paused',
+        }}
+      >
+        {/* Holographic light reflection sheen */}
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none opacity-50 group-hover/vinyl:opacity-75 transition-opacity"
+          style={{
+            background: 'conic-gradient(from 45deg, rgba(255,255,255,0.2) 0deg, transparent 45deg, rgba(6,182,212,0.25) 90deg, transparent 135deg, rgba(255,255,255,0.2) 180deg, transparent 225deg, rgba(139,92,246,0.25) 270deg, transparent 315deg, rgba(255,255,255,0.2) 360deg)'
+          }}
+        />
+
+        {/* Fine concentric micro-grooves */}
+        <div className="absolute inset-[15%] rounded-full border border-white/5 pointer-events-none" />
+        <div className="absolute inset-[27%] rounded-full border border-white/5 pointer-events-none" />
+        <div className="absolute inset-[38%] rounded-full border border-white/10 pointer-events-none" />
+
+        {/* Center Vinyl Label with Sci-Fi Neon Gradient */}
+        <div
+          className="rounded-full flex items-center justify-center shadow-lg relative z-10 border border-black/40"
+          style={{
+            width: Math.round(size * 0.38),
+            height: Math.round(size * 0.38),
+            background: 'radial-gradient(circle at 35% 35%, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)',
+          }}
+        >
+          {/* Circular track ring on label */}
+          <div className="absolute inset-[18%] rounded-full border border-white/30 pointer-events-none" />
+
+          {/* Center spindle hole */}
+          <div
+            className="rounded-full bg-[#050507] border border-cyan-300/40 shadow-inner flex items-center justify-center"
+            style={{ width: Math.max(6, Math.round(size * 0.12)), height: Math.max(6, Math.round(size * 0.12)) }}
+          >
+            <div className="w-1 h-1 rounded-full bg-cyan-accent" />
+          </div>
+        </div>
+      </div>
+
+      {/* Floating Stylus Tonearm Indicator in standard size */}
+      {size >= 80 && (
+        <div 
+          className="absolute -top-1 -right-2 pointer-events-none transition-transform duration-500 origin-top-right z-20"
+          style={{
+            transform: isPlaying ? 'rotate(0deg)' : 'rotate(-18deg)'
+          }}
+        >
+          <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-b from-gray-600 to-gray-900 border border-white/20 shadow-md flex items-center justify-center">
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-accent/80" />
+          </div>
+          <div className="w-1.5 h-10 bg-gradient-to-b from-gray-400 to-gray-600 rounded-sm -mt-0.5 ml-1 shadow-sm relative">
+            <div className="absolute -bottom-1 -left-1 w-3.5 h-2 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-xs shadow-[0_0_6px_rgba(6,182,212,0.8)]" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ─────────────────────────────────────────────────────────
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
-  const { ref: sizeRef, sz, isSM } = useContainerSize();
+  const { ref: sizeRef, width, height } = useContainerSize();
+  const isCompact = height < 225 || width < 280;
+  const isTiny = height < 165 || width < 220;
   const audioRef = useRef<HTMLAudioElement>(null);
 
   // ── persisted state ──────────────────────────────────
@@ -212,7 +309,8 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
     } catch (err) { console.error('Upload failed', err); }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     await db.files.delete(id);
     const newIds = fileIds.filter(f => f !== id);
     const nextActive = id === activeAudioId ? (newIds[0] || null) : activeAudioId;
@@ -317,15 +415,14 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
                     )}
                   </div>
 
-                  {/* Delete */}
-                  {showControls && (
-                    <button
-                      onClick={() => handleDelete(a.id)}
-                      className="opacity-0 group-hover/track:opacity-100 p-1 rounded hover:bg-glass-bg text-muted-text hover:text-red-400 cursor-pointer transition-all"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  )}
+                  {/* Delete Track */}
+                  <button
+                    onClick={(e) => handleDelete(a.id, e)}
+                    className="opacity-0 group-hover/track:opacity-100 p-1.5 rounded hover:bg-red-500/10 text-muted-text hover:text-red-400 cursor-pointer transition-all"
+                    title="Delete track"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               );
             })
@@ -334,7 +431,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
 
         {/* Mini player bar at bottom */}
         {activeAudio && (
-          <div className="shrink-0 border-t border-color-border-color bg-glass-bg/20 px-4 py-2 flex items-center gap-3">
+          <div className="shrink-0 border-t border-color-border-color bg-glass-bg/20 px-3 py-1.5 flex items-center gap-2.5">
             <audio
               ref={audioRef}
               src={blobUrl}
@@ -343,11 +440,12 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
               onEnded={handleEnded}
               className="hidden"
             />
+            <VinylRecord isPlaying={isPlaying} size={28} onClick={togglePlay} />
             <button onClick={skipPrev} className="text-muted-text hover:text-primary-text cursor-pointer transition-colors">
               <SkipBack className="w-3.5 h-3.5" />
             </button>
-            <button onClick={togglePlay} className="w-7 h-7 rounded-full bg-cyan-accent text-black flex items-center justify-center cursor-pointer hover:opacity-90 shrink-0">
-              {isPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+            <button onClick={togglePlay} className="w-6 h-6 rounded-full bg-cyan-accent text-black flex items-center justify-center cursor-pointer hover:opacity-90 shrink-0">
+              {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3 fill-current ml-0.5" />}
             </button>
             <button onClick={skipNext} className="text-muted-text hover:text-primary-text cursor-pointer transition-colors">
               <SkipForward className="w-3.5 h-3.5" />
@@ -356,7 +454,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
               <input
                 type="range" min={0} max={duration || 0} step={0.1} value={currentTime}
                 onChange={handleSeek}
-                className="w-full h-1 accent-cyan-500 cursor-pointer"
+                className="w-full h-1 accent-cyan-400 cursor-pointer"
               />
             </div>
             <span className="text-[9px] text-muted-text font-mono shrink-0">{fmt(currentTime)}/{fmt(duration)}</span>
@@ -373,7 +471,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
   // PLAYER VIEW — default
   // ─────────────────────────────────────────────────────
   return (
-    <div ref={sizeRef} className="w-full h-full flex flex-col p-4 text-xs text-primary-text bg-transparent overflow-hidden">
+    <div ref={sizeRef} className={`w-full h-full flex flex-col ${isCompact ? 'p-2.5' : 'p-4'} text-xs text-primary-text bg-transparent overflow-hidden`}>
 
       {/* Hidden audio element */}
       <audio
@@ -386,114 +484,267 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
       />
 
       {activeAudio ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 overflow-hidden">
+        isCompact ? (
+          /* ── COMPACT / SMALL WIDGET VIEW ───────────────────── */
+          <div className="flex-1 w-full h-full flex flex-col justify-between overflow-hidden min-h-0">
+            {/* Top section: Revolving Vinyl Disc + Track Details + Equalizer waves */}
+            <div className="flex items-center gap-2.5 min-w-0 shrink-0">
+              <VinylRecord
+                isPlaying={isPlaying}
+                size={isTiny ? 46 : 56}
+                onClick={togglePlay}
+              />
 
-          {/* Vinyl disc — scales with widget size */}
-          <div
-            className={`rounded-full bg-gradient-to-tr from-cyan-accent via-purple-500/60 to-pink-400/40 flex items-center justify-center shadow-[0_0_40px_rgba(34,211,238,0.25)] shrink-0 transition-all duration-700 ${isPlaying ? 'animate-spin' : ''} ${sz === 'xs' ? 'w-12 h-12' : sz === 'sm' ? 'w-16 h-16' : sz === 'md' ? 'w-20 h-20' : 'w-24 h-24'}`}
-            style={{ animationDuration: '4s' }}
-          >
-            <div className={`bg-[#0d0d0d] rounded-full border-2 border-black/20 flex items-center justify-center ${sz === 'xs' ? 'w-4 h-4' : sz === 'sm' ? 'w-5 h-5' : 'w-8 h-8'}`}>
-              <div className="w-1.5 h-1.5 rounded-full bg-cyan-accent/40" />
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
+                <div className="flex items-center justify-between gap-1">
+                  <p className="font-bold text-xs text-primary-text truncate" title={activeAudio.name}>
+                    {activeAudio.name}
+                  </p>
+                  {/* Mini equalizer bars */}
+                  <div className="flex gap-0.5 items-end h-3 shrink-0">
+                    {[1, 2, 3, 4].map(i => (
+                      <div
+                        key={i}
+                        className={`w-0.5 bg-cyan-accent rounded-full transition-all duration-300 ${isPlaying ? 'animate-pulse' : 'opacity-30'}`}
+                        style={{
+                          height: isPlaying ? `${4 + (i % 2 === 0 ? 8 : 4)}px` : '3px',
+                          animationDuration: `${0.4 + i * 0.15}s`
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-muted-text font-mono">
+                  <span className="text-cyan-accent/80 font-semibold">{fmt(currentTime)} <span className="text-muted-text">/ {fmt(duration)}</span></span>
+                  <span className="text-[9px] text-muted-text">
+                    {audios.indexOf(activeAudio) + 1}/{audios.length}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle: Progress Scrub Bar */}
+            <div className="w-full flex items-center my-0.5 shrink-0">
+              <input
+                type="range"
+                min={0}
+                max={duration || 0}
+                step={0.1}
+                value={currentTime}
+                onChange={handleSeek}
+                className="w-full h-1 rounded-full appearance-none cursor-pointer accent-cyan-400 bg-white/10 hover:bg-white/20 transition-colors"
+              />
+            </div>
+
+            {/* Bottom: Playback Controls */}
+            <div className="flex items-center justify-between pt-0.5 shrink-0">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={skipPrev}
+                  className="p-1 rounded-lg text-secondary-text hover:text-primary-text hover:bg-glass-bg cursor-pointer transition-colors"
+                  title="Previous Track"
+                >
+                  <SkipBack className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={togglePlay}
+                  className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-accent to-blue-500 text-black flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-[0_0_12px_rgba(6,182,212,0.4)]"
+                  title={isPlaying ? 'Pause' : 'Play'}
+                >
+                  {isPlaying ? (
+                    <Pause className="w-3.5 h-3.5" />
+                  ) : (
+                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                  )}
+                </button>
+
+                <button
+                  onClick={skipNext}
+                  className="p-1 rounded-lg text-secondary-text hover:text-primary-text hover:bg-glass-bg cursor-pointer transition-colors"
+                  title="Next Track"
+                >
+                  <SkipForward className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Secondary icons */}
+              <div className="flex items-center gap-0.5 text-muted-text">
+                <button
+                  onClick={toggleLoop}
+                  className={`p-1 rounded-lg cursor-pointer transition-colors ${
+                    isLoop ? 'text-cyan-accent bg-cyan-accent/10' : 'hover:text-primary-text'
+                  }`}
+                  title={isLoop ? 'Loop: On' : 'Loop: Off'}
+                >
+                  <Repeat className="w-3 h-3" />
+                </button>
+
+                <button
+                  onClick={() => toggleView('playlist')}
+                  className="p-1 rounded-lg hover:text-primary-text cursor-pointer transition-colors"
+                  title="Playlist"
+                >
+                  <List className="w-3 h-3" />
+                </button>
+
+                {showControls && (
+                  <label
+                    className="p-1 rounded-lg hover:text-cyan-accent cursor-pointer transition-colors"
+                    title="Upload Audio"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <input
+                      type="file"
+                      accept="audio/*,.mp3,.wav,.ogg,.flac,.aac"
+                      onChange={handleUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+
+                <button
+                  onClick={() => setIsMuted(m => !m)}
+                  className="p-1 rounded-lg hover:text-primary-text cursor-pointer transition-colors"
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5" />}
+                </button>
+
+                <button
+                  onClick={(e) => activeAudio && handleDelete(activeAudio.id, e)}
+                  className="p-1 rounded-lg text-muted-text hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
+                  title="Delete Track"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Track name */}
-          {!isSM && (
-            <div className="text-center px-2 w-full">
-              <p className="font-bold text-sm text-primary-text truncate">{activeAudio.name}</p>
-              <p className="text-[10px] text-muted-text mt-0.5">{audios.indexOf(activeAudio) + 1} / {audios.length} tracks</p>
+        ) : (
+          /* ── STANDARD / LARGE WIDGET VIEW ──────────────────── */
+          <div className="flex-1 w-full h-full flex flex-col items-center justify-between py-1 overflow-hidden min-h-0">
+            {/* Centered Vinyl Record with Stylus */}
+            <div className="relative my-auto flex items-center justify-center">
+              <VinylRecord
+                isPlaying={isPlaying}
+                size={height > 340 ? 120 : height > 280 ? 96 : 80}
+                onClick={togglePlay}
+              />
             </div>
-          )}
-          {isSM && (
-            <p className="font-bold text-[10px] text-primary-text truncate px-2 w-full text-center">{activeAudio.name}</p>
-          )}
 
-          {/* Progress bar */}
-          <div className="w-full max-w-xs flex items-center gap-2">
-            {!isSM && <span className="text-[9px] font-mono text-muted-text w-8 shrink-0 text-right">{fmt(currentTime)}</span>}
-            <input
-              type="range" min={0} max={duration || 0} step={0.1} value={currentTime}
-              onChange={handleSeek}
-              className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-cyan-500 bg-white/10"
-            />
-            {!isSM && <span className="text-[9px] font-mono text-muted-text w-8 shrink-0">{fmt(duration)}</span>}
-          </div>
+            {/* Track details & Equalizer */}
+            <div className="text-center px-2 w-full shrink-0 mb-2">
+              <div className="flex items-center justify-center gap-2">
+                <p className="font-bold text-sm text-primary-text truncate max-w-[240px]">{activeAudio.name}</p>
+                <div className="flex gap-0.5 items-end h-3 shrink-0">
+                  {[1, 2, 3, 4].map(i => (
+                    <div
+                      key={i}
+                      className={`w-0.5 bg-cyan-accent rounded-full transition-all duration-300 ${isPlaying ? 'animate-pulse' : 'opacity-40'}`}
+                      style={{
+                        height: isPlaying ? `${4 + (i % 2 === 0 ? 8 : 4)}px` : '3px',
+                        animationDuration: `${0.4 + i * 0.15}s`
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-[10px] text-muted-text mt-0.5">
+                Track {audios.indexOf(activeAudio) + 1} of {audios.length} · {isPlaying ? 'Playing' : 'Paused'}
+              </p>
+            </div>
 
-          {/* Controls */}
-          <div className={`flex items-center ${sz === 'xs' ? 'gap-2' : 'gap-4'}`}>
-            {!isSM && (
+            {/* Progress bar */}
+            <div className="w-full max-w-xs flex items-center gap-2 shrink-0 mb-2">
+              <span className="text-[9px] font-mono text-muted-text w-8 shrink-0 text-right">{fmt(currentTime)}</span>
+              <input
+                type="range" min={0} max={duration || 0} step={0.1} value={currentTime}
+                onChange={handleSeek}
+                className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-cyan-400 bg-white/10 hover:bg-white/20 transition-colors"
+              />
+              <span className="text-[9px] font-mono text-muted-text w-8 shrink-0">{fmt(duration)}</span>
+            </div>
+
+            {/* Primary Controls */}
+            <div className="flex items-center gap-3 shrink-0 mb-2">
               <button onClick={toggleLoop} title={isLoop ? 'Loop ON' : 'Loop OFF'}
-                className={`transition-colors cursor-pointer ${isLoop ? 'text-cyan-accent' : 'text-muted-text hover:text-secondary-text'}`}>
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isLoop ? 'text-cyan-accent bg-cyan-accent/10' : 'text-muted-text hover:text-secondary-text'}`}>
                 <Repeat className="w-3.5 h-3.5" />
               </button>
-            )}
 
-            <button onClick={skipPrev} className="text-secondary-text hover:text-primary-text cursor-pointer transition-colors">
-              <SkipBack className={sz === 'xs' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-            </button>
+              <button onClick={skipPrev} className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors" title="Previous Track">
+                <SkipBack className="w-4 h-4" />
+              </button>
 
-            <button
-              onClick={togglePlay}
-              className={`rounded-full bg-gradient-to-br from-cyan-accent to-blue-500 text-black flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-[0_0_20px_rgba(34,211,238,0.3)] ${sz === 'xs' ? 'w-7 h-7' : 'w-10 h-10'}`}
-            >
-              {isPlaying
-                ? <Pause className={sz === 'xs' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-                : <Play className={`fill-current ml-0.5 ${sz === 'xs' ? 'w-3.5 h-3.5' : 'w-4 h-4'}`} />
-              }
-            </button>
+              <button
+                onClick={togglePlay}
+                className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-accent to-blue-500 text-black flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+                title={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying
+                  ? <Pause className="w-4 h-4" />
+                  : <Play className="w-4 h-4 fill-current ml-0.5" />
+                }
+              </button>
 
-            <button onClick={skipNext} className="text-secondary-text hover:text-primary-text cursor-pointer transition-colors">
-              <SkipForward className={sz === 'xs' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-            </button>
+              <button onClick={skipNext} className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors" title="Next Track">
+                <SkipForward className="w-4 h-4" />
+              </button>
 
-            {!isSM && (
               <button
                 onClick={toggleShuffle}
                 title={isShuffle ? 'Shuffle ON' : 'Shuffle OFF'}
-                className={`transition-colors cursor-pointer ${isShuffle ? 'text-purple-400' : 'text-muted-text hover:text-secondary-text'}`}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isShuffle ? 'text-purple-400 bg-purple-400/10' : 'text-muted-text hover:text-secondary-text'}`}
               >
                 <Shuffle className="w-3.5 h-3.5" />
               </button>
-            )}
 
-            {/* Playlist toggle */}
-            <button
-              onClick={() => toggleView('playlist')}
-              title="Open playlist"
-              className="text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
-            >
-              <List className={sz === 'xs' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-            </button>
+              <button
+                onClick={() => toggleView('playlist')}
+                title="Open playlist"
+                className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
+              >
+                <List className="w-4 h-4" />
+              </button>
 
-            {/* Upload */}
-            {showControls && (
-              <label className="text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors" title="Upload Audio">
-                <Upload className={sz === 'xs' ? 'w-3.5 h-3.5' : 'w-4 h-4'} />
-                <input type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.aac" onChange={handleUpload} className="hidden" />
-              </label>
-            )}
+              {showControls && (
+                <label className="p-1.5 rounded-lg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors" title="Upload Audio">
+                  <Upload className="w-4 h-4" />
+                  <input type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.aac" onChange={handleUpload} className="hidden" />
+                </label>
+              )}
+
+              <button
+                onClick={(e) => activeAudio && handleDelete(activeAudio.id, e)}
+                className="p-1.5 rounded-lg text-secondary-text hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
+                title="Delete Track"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Volume + Mute */}
+            <div className="flex items-center gap-2 w-full max-w-xs shrink-0 px-2">
+              <button onClick={() => setIsMuted(m => !m)} className="text-muted-text hover:text-primary-text cursor-pointer shrink-0" title={isMuted ? 'Unmute' : 'Mute'}>
+                {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5" />}
+              </button>
+              <input
+                type="range" min={0} max={1} step={0.02} value={isMuted ? 0 : volume}
+                onChange={e => { const v = parseFloat(e.target.value); setVolume(v); setIsMuted(v === 0); }}
+                className="flex-1 h-1 cursor-pointer accent-cyan-400"
+              />
+            </div>
           </div>
-
-          {/* Volume + Mute */}
-          <div className="flex items-center gap-2 w-full max-w-xs">
-            <button onClick={() => setIsMuted(m => !m)} className="text-muted-text hover:text-primary-text cursor-pointer shrink-0">
-              {isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
-            </button>
-            <input
-              type="range" min={0} max={1} step={0.02} value={isMuted ? 0 : volume}
-              onChange={e => { const v = parseFloat(e.target.value); setVolume(v); setIsMuted(v === 0); }}
-              className="flex-1 h-1 cursor-pointer accent-cyan-500"
-            />
-          </div>
-        </div>
+        )
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-muted-text border border-dashed border-color-border-color rounded-xl">
-          <Disc className={sz === 'xs' ? 'w-6 h-6 opacity-30' : 'w-10 h-10 opacity-30'} />
-          {!isSM && <span className="text-center italic px-4">No audio loaded. Upload a track to get started.</span>}
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-text border border-dashed border-color-border-color rounded-xl p-3">
+          <VinylRecord isPlaying={false} size={isCompact ? 46 : 64} />
+          {!isTiny && <span className="text-center italic text-[11px] px-2">No audio loaded. Upload a track to start.</span>}
           {showControls && (
-            <label className="px-2.5 py-1.5 rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors">
-              <Upload className="w-3.5 h-3.5 text-cyan-accent" />
+            <label className="px-2.5 py-1 rounded-lg border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors text-[10px] text-cyan-accent">
+              <Upload className="w-3 h-3 text-cyan-accent" />
               <span>Upload Audio</span>
               <input type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.aac" onChange={handleUpload} className="hidden" />
             </label>

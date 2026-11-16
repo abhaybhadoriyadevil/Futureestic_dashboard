@@ -7,7 +7,7 @@ import { useContainerSize } from '../../hooks/useContainerSize';
 import {
   Grid,
   Play,
-  Square,
+  Pause,
   ZoomIn,
   ZoomOut,
   ChevronLeft,
@@ -16,6 +16,7 @@ import {
   X,
   Layers3,
   Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 
 interface ImagesWidgetProps {
@@ -50,6 +51,14 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
         if (parsed.fileIds && Array.isArray(parsed.fileIds)) setFileIds(parsed.fileIds);
         else setFileIds([]);
         setSelectedImageId(parsed.selectedImageId || null);
+        if (parsed.viewMode && ['grid', 'masonry', 'slideshow'].includes(parsed.viewMode)) {
+          setViewMode(parsed.viewMode);
+          if (parsed.viewMode === 'slideshow') {
+            setIsPlaying(parsed.isPlaying !== undefined ? parsed.isPlaying : true);
+          } else {
+            setIsPlaying(false);
+          }
+        }
       } catch { setFileIds([]); setSelectedImageId(null); }
     } else { setFileIds([]); setSelectedImageId(null); }
   }, [dataRef]);
@@ -72,6 +81,33 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
     return () => clearInterval(interval);
   }, [isPlaying, images]);
 
+  const handleSelectViewMode = async (mode: 'grid' | 'masonry' | 'slideshow') => {
+    setViewMode(mode);
+    const playState = mode === 'slideshow' ? true : false;
+    setIsPlaying(playState);
+    await commitWidgetUpdate(widgetId, {
+      dataRef: JSON.stringify({
+        fileIds,
+        selectedImageId: selectedImageId || undefined,
+        viewMode: mode,
+        isPlaying: playState,
+      })
+    });
+  };
+
+  const handleTogglePlay = async () => {
+    const nextPlaying = !isPlaying;
+    setIsPlaying(nextPlaying);
+    await commitWidgetUpdate(widgetId, {
+      dataRef: JSON.stringify({
+        fileIds,
+        selectedImageId: selectedImageId || undefined,
+        viewMode: 'slideshow',
+        isPlaying: nextPlaying,
+      })
+    });
+  };
+
   const handleUploadImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -83,9 +119,38 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
       } as FileData);
       const newFileIds = [...fileIds, id];
       await commitWidgetUpdate(widgetId, {
-        dataRef: JSON.stringify({ fileIds: newFileIds, selectedImageId: selectedImageId || undefined })
+        dataRef: JSON.stringify({
+          fileIds: newFileIds,
+          selectedImageId: selectedImageId || undefined,
+          viewMode,
+          isPlaying: viewMode === 'slideshow' ? isPlaying : undefined,
+        })
       });
     } catch (err) { console.error('Image upload failed', err); }
+  };
+
+  const handleDeleteImage = async (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      await db.files.delete(id);
+      const newFileIds = fileIds.filter(fId => fId !== id);
+      const nextSelected = selectedImageId === id ? null : selectedImageId;
+      await commitWidgetUpdate(widgetId, {
+        dataRef: JSON.stringify({
+          fileIds: newFileIds,
+          selectedImageId: nextSelected || undefined,
+          viewMode,
+          isPlaying: viewMode === 'slideshow' ? (newFileIds.length > 0 && isPlaying) : false,
+        })
+      });
+      if (selectedImageId === id) setSelectedImageId(null);
+      if (lightboxImage?.id === id) setLightboxImage(null);
+      if (currentIndex >= newFileIds.length) {
+        setCurrentIndex(Math.max(0, newFileIds.length - 1));
+      }
+    } catch (err) {
+      console.error('Failed to delete image', err);
+    }
   };
 
   const handleZoom = (d: 'in' | 'out') =>
@@ -117,46 +182,81 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
   return (
     <div ref={ref} className="w-full h-full flex flex-col p-2 text-xs text-primary-text bg-transparent overflow-hidden">
 
-      {/* Controls bar — show when showControls is true, regardless of selected image */}
+      {/* Controls bar — show when showControls is true */}
       {showControls && (
         <div className={`flex ${isSM ? 'flex-col gap-1.5' : 'justify-between items-center'} mb-2 gap-2 shrink-0`}>
           {/* View mode pills — only shown when no image is selected */}
-          {!selectedImageId && (
-            <div className="flex rounded-xl bg-glass-bg border border-color-border-color p-0.5 shrink-0">
+          {!selectedImageId ? (
+            <div className="flex items-center gap-1.5">
+              <div className="flex rounded-xl bg-glass-bg border border-color-border-color p-0.5 shrink-0">
+                <button
+                  onClick={() => handleSelectViewMode('grid')}
+                  className={`p-1.5 rounded-lg cursor-pointer transition-colors ${viewMode === 'grid' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'}`}
+                  title="Grid View"
+                >
+                  <Grid className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
+                </button>
+                <button
+                  onClick={() => handleSelectViewMode('masonry')}
+                  className={`p-1.5 rounded-lg cursor-pointer transition-colors ${viewMode === 'masonry' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'}`}
+                  title="Masonry View"
+                >
+                  <Layers3 className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
+                </button>
+                <button
+                  onClick={() => handleSelectViewMode('slideshow')}
+                  className={`p-1.5 rounded-lg cursor-pointer transition-colors ${viewMode === 'slideshow' ? 'bg-cyan-accent text-black font-semibold' : 'text-secondary-text hover:text-primary-text'}`}
+                  title="Slideshow View"
+                >
+                  <Play className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
+                </button>
+              </div>
+
+              {/* In Slideshow mode, show Play/Pause button in top controls */}
+              {viewMode === 'slideshow' && images.length > 0 && (
+                <button
+                  onClick={handleTogglePlay}
+                  className={`px-2 py-1 rounded-xl text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-all ${
+                    isPlaying 
+                      ? 'bg-purple-accent/90 hover:bg-purple-accent text-white shadow-[0_0_10px_rgba(139,92,246,0.25)]' 
+                      : 'bg-cyan-accent hover:bg-cyan-accent/90 text-black shadow-[0_0_10px_rgba(6,182,212,0.25)]'
+                  }`}
+                  title={isPlaying ? 'Pause Slideshow' : 'Play Slideshow'}
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="w-3 h-3 fill-current" />
+                      {!isSM && <span>Pause</span>}
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3 h-3 fill-current" />
+                      {!isSM && <span>Play</span>}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          ) : (
+            /* Back & Delete buttons — shown when single image is selected */
+            <div className="flex items-center gap-1.5">
               <button
-                onClick={() => { setViewMode('grid'); setIsPlaying(false); }}
-                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${viewMode === 'grid' ? 'bg-cyan-accent text-black' : 'text-secondary-text hover:text-primary-text'}`}
-                title="Grid"
+                onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, viewMode, isPlaying: viewMode === 'slideshow' ? true : false }) }); }}
+                className={`rounded-xl border border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1 cursor-pointer hover:bg-cyan-accent/5 transition-colors ${isSM ? 'px-2 py-1 text-[9px]' : 'px-2.5 py-1.5 text-[10px]'}`}
+                title="Back to gallery"
               >
-                <Grid className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
+                <ChevronLeft className={sz === 'xs' ? 'w-2.5 h-2.5 text-cyan-accent' : 'w-3.5 h-3.5 text-cyan-accent'} />
+                {!isSM && <span>Back</span>}
               </button>
               <button
-                onClick={() => { setViewMode('masonry'); setIsPlaying(false); }}
-                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${viewMode === 'masonry' ? 'bg-cyan-accent text-black' : 'text-secondary-text hover:text-primary-text'}`}
-                title="Masonry"
+                onClick={(e) => selectedImageId && handleDeleteImage(selectedImageId, e)}
+                className={`rounded-xl border border-red-500/30 hover:border-red-500 text-red-400 font-semibold flex items-center gap-1 cursor-pointer hover:bg-red-500/10 transition-colors ${isSM ? 'px-2 py-1 text-[9px]' : 'px-2.5 py-1.5 text-[10px]'}`}
+                title="Delete Image"
               >
-                <Layers3 className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
-              </button>
-              <button
-                onClick={() => setViewMode('slideshow')}
-                className={`p-1.5 rounded-lg cursor-pointer transition-colors ${viewMode === 'slideshow' ? 'bg-cyan-accent text-black' : 'text-secondary-text hover:text-primary-text'}`}
-                title="Slideshow"
-              >
-                <Play className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
+                <Trash2 className={sz === 'xs' ? 'w-2.5 h-2.5' : 'w-3.5 h-3.5'} />
+                {!isSM && <span>Delete</span>}
               </button>
             </div>
-          )}
-
-          {/* Back button — only shown when image is selected */}
-          {selectedImageId && (
-            <button
-              onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds }) }); }}
-              className={`rounded-xl border border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1 cursor-pointer hover:bg-cyan-accent/5 transition-colors ${isSM ? 'px-2 py-1 text-[9px]' : 'px-2.5 py-1.5 text-[10px]'}`}
-              title="Back to gallery"
-            >
-              <ChevronLeft className={sz === 'xs' ? 'w-2.5 h-2.5 text-cyan-accent' : 'w-3.5 h-3.5 text-cyan-accent'} />
-              {!isSM && <span>Back</span>}
-            </button>
           )}
 
           <label className={`rounded-xl border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1 cursor-pointer hover:bg-cyan-accent/5 transition-colors ${isSM ? 'px-2 py-1 text-[9px]' : 'px-2.5 py-1.5 text-[10px]'}`}>
@@ -168,26 +268,35 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
       )}
 
       {/* Gallery body */}
-      <div className="flex-1 overflow-y-auto no-scrollbar relative">
+      <div className="flex-1 min-h-0 w-full relative overflow-hidden flex flex-col">
         {selectedImage ? (
           /* Inline persistent viewer */
-          <div className="w-full h-full flex flex-col justify-between items-center rounded-xl p-1 relative overflow-hidden">
-            <div className="flex-1 w-full flex items-center justify-center relative overflow-hidden bg-black/10 rounded-lg">
+          <div className="w-full h-full flex flex-col justify-between items-center rounded-xl p-1 relative overflow-hidden min-h-0">
+            <div className="flex-1 min-h-0 w-full flex items-center justify-center relative overflow-hidden bg-black/10 rounded-lg">
               <img
                 src={URL.createObjectURL(selectedImage.blob)}
                 alt={selectedImage.name}
-                className="max-h-full max-w-full object-contain rounded-lg shadow-lg transition-transform duration-300"
+                className="max-h-full max-w-full w-auto h-auto object-contain rounded-lg shadow-lg transition-transform duration-300"
               />
-              {/* X button only shown when controls are hidden, so user can always go back */}
-              {!showControls && (
+              {/* Overlay controls in top right */}
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
                 <button
-                  onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds }) }); }}
-                  className="absolute top-2 right-2 p-1 rounded-xl bg-black/70 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent transition-all cursor-pointer z-10"
-                  title="Back to gallery"
+                  onClick={(e) => handleDeleteImage(selectedImage.id, e)}
+                  className="p-1.5 rounded-xl bg-black/70 hover:bg-red-500/80 text-white/80 hover:text-white border border-white/10 hover:border-red-500 transition-all cursor-pointer shadow-md"
+                  title="Delete Image"
                 >
-                  <X className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </button>
-              )}
+                {!showControls && (
+                  <button
+                    onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, viewMode, isPlaying: viewMode === 'slideshow' ? true : false }) }); }}
+                    className="p-1.5 rounded-xl bg-black/70 hover:bg-black/90 text-white/80 hover:text-cyan-accent border border-white/10 hover:border-cyan-accent/50 transition-all cursor-pointer shadow-md"
+                    title="Back to gallery"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ) : images.length === 0 ? (
@@ -196,11 +305,11 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
             {!isSM && <p className="italic text-center px-3">No images. Upload to get started.</p>}
           </div>
         ) : viewMode === 'grid' ? (
-          <div className={`grid ${gridCols} gap-1.5 pb-4`}>
+          <div className={`flex-1 overflow-y-auto no-scrollbar grid ${gridCols} gap-1.5 pb-4 min-h-0`}>
             {images.map(img => (
               <div
                 key={img.id}
-                onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, selectedImageId: img.id }) }); }}
+                onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, selectedImageId: img.id, viewMode, isPlaying: false }) }); }}
                 className="aspect-square rounded-lg overflow-hidden border border-color-border-color bg-glass-bg cursor-pointer hover:border-cyan-accent transition-colors relative group/item"
               >
                 <img
@@ -208,57 +317,111 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
                   alt={img.name}
                   className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-300"
                 />
+                <button
+                  onClick={(e) => handleDeleteImage(img.id, e)}
+                  className="absolute top-1 right-1 p-1 rounded-md bg-black/70 hover:bg-red-500 text-white/70 hover:text-white opacity-0 group-hover/item:opacity-100 transition-all cursor-pointer shadow-md z-10"
+                  title="Delete image"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
             ))}
           </div>
         ) : viewMode === 'masonry' ? (
-          <div className={`${masonryCols} gap-1.5 space-y-1.5 pb-4`}>
+          <div className={`flex-1 overflow-y-auto no-scrollbar ${masonryCols} gap-1.5 space-y-1.5 pb-4 min-h-0`}>
             {images.map(img => (
               <div
                 key={img.id}
-                onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, selectedImageId: img.id }) }); }}
-                className="break-inside-avoid rounded-lg overflow-hidden border border-color-border-color bg-glass-bg cursor-pointer hover:border-cyan-accent transition-colors"
+                onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, selectedImageId: img.id, viewMode, isPlaying: false }) }); }}
+                className="break-inside-avoid rounded-lg overflow-hidden border border-color-border-color bg-glass-bg cursor-pointer hover:border-cyan-accent transition-colors relative group/item"
               >
                 <img src={URL.createObjectURL(img.blob)} alt={img.name} className="w-full h-auto object-cover" />
+                <button
+                  onClick={(e) => handleDeleteImage(img.id, e)}
+                  className="absolute top-1.5 right-1.5 p-1 rounded-md bg-black/70 hover:bg-red-500 text-white/70 hover:text-white opacity-0 group-hover/item:opacity-100 transition-all cursor-pointer shadow-md z-10"
+                  title="Delete image"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               </div>
             ))}
           </div>
         ) : (
           /* Slideshow */
-          <div className="w-full h-full flex flex-col justify-between items-center bg-primary-bg/40 border border-color-border-color rounded-xl p-2 relative overflow-hidden">
-            {images[currentIndex] && (
+          <div className="w-full h-full flex flex-col justify-between items-center bg-primary-bg/50 border border-color-border-color rounded-xl p-2 relative overflow-hidden min-h-0">
+            {images[currentIndex] ? (
               <div
-                className="flex-1 w-full flex items-center justify-center relative cursor-pointer"
-                onClick={async () => { await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, selectedImageId: images[currentIndex].id }) }); }}
+                className="flex-1 min-h-0 w-full flex items-center justify-center relative overflow-hidden cursor-pointer group/slide select-none"
+                onClick={async () => {
+                  await commitWidgetUpdate(widgetId, { dataRef: JSON.stringify({ fileIds, selectedImageId: images[currentIndex].id, viewMode, isPlaying: false }) });
+                }}
               >
                 <img
                   src={URL.createObjectURL(images[currentIndex].blob)}
                   alt={images[currentIndex].name}
-                  className="max-h-full max-w-full object-contain rounded-lg shadow-lg"
+                  className="max-h-full max-w-full w-auto h-auto object-contain rounded-lg shadow-lg pointer-events-none transition-all duration-300"
                 />
+
+                {/* Floating Previous & Next arrow buttons on hover */}
                 <button
                   onClick={e => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + images.length) % images.length); }}
-                  className="absolute left-1 p-1 rounded-full glass-panel hover:bg-glass-bg cursor-pointer"
+                  className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent cursor-pointer transition-all z-10 opacity-70 group-hover/slide:opacity-100 shadow-md"
+                  title="Previous image"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % images.length); }}
-                  className="absolute right-1 p-1 rounded-full glass-panel hover:bg-glass-bg cursor-pointer"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent cursor-pointer transition-all z-10 opacity-70 group-hover/slide:opacity-100 shadow-md"
+                  title="Next image"
                 >
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
-            )}
-            <div className="w-full flex items-center justify-between border-t border-color-border-color pt-2 mt-2">
-              <div className="flex items-center gap-2 ml-auto">
+            ) : null}
+
+            {/* Bottom Controls Bar — ALWAYS visible with shrink-0, never pushed off */}
+            <div className="w-full h-8 shrink-0 flex items-center justify-between border-t border-color-border-color/60 pt-1 mt-1 z-10 px-1">
+              <div className="flex items-center gap-1.5">
                 <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className={`px-2 py-1 rounded-lg text-[9px] font-semibold flex items-center gap-1 cursor-pointer transition-colors ${isPlaying ? 'bg-purple-accent text-white' : 'bg-cyan-accent text-black'}`}
+                  onClick={handleTogglePlay}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1 cursor-pointer transition-colors shadow-sm ${
+                    isPlaying ? 'bg-purple-accent text-white' : 'bg-cyan-accent text-black font-bold'
+                  }`}
+                  title={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? <><Square className="w-2.5 h-2.5 fill-current" />{!isSM && 'Pause'}</> : <><Play className="w-2.5 h-2.5 fill-current" />{!isSM && 'Play'}</>}
+                  {isPlaying ? (
+                    <>
+                      <Pause className="w-3 h-3 fill-current" />
+                      <span>Pause</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3 h-3 fill-current" />
+                      <span>Play</span>
+                    </>
+                  )}
                 </button>
-                <span className="text-[9px] text-muted-text">{currentIndex + 1}/{images.length}</span>
+                {images[currentIndex] && (
+                  <button
+                    onClick={(e) => handleDeleteImage(images[currentIndex].id, e)}
+                    className="p-1 rounded-lg text-muted-text hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
+                    title="Delete this image"
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {images[currentIndex] && (
+                  <span className="text-[10px] text-muted-text truncate max-w-[120px] hidden sm:inline" title={images[currentIndex].name}>
+                    {images[currentIndex].name}
+                  </span>
+                )}
+                <span className="text-[10px] text-cyan-accent font-mono font-semibold bg-cyan-accent/10 border border-cyan-accent/20 px-2 py-0.5 rounded-full">
+                  {currentIndex + 1} / {images.length}
+                </span>
               </div>
             </div>
           </div>
@@ -269,9 +432,10 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
       {lightboxImage && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 p-6">
           <div className="absolute top-4 right-4 flex items-center gap-2">
-            <button onClick={() => handleZoom('in')} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-cyan-accent cursor-pointer"><ZoomIn className="w-4 h-4" /></button>
-            <button onClick={() => handleZoom('out')} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-cyan-accent cursor-pointer"><ZoomOut className="w-4 h-4" /></button>
-            <button onClick={() => setLightboxImage(null)} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-red-500 cursor-pointer"><X className="w-5 h-5" /></button>
+            <button onClick={() => handleZoom('in')} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-cyan-accent cursor-pointer" title="Zoom in"><ZoomIn className="w-4 h-4" /></button>
+            <button onClick={() => handleZoom('out')} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-cyan-accent cursor-pointer" title="Zoom out"><ZoomOut className="w-4 h-4" /></button>
+            <button onClick={(e) => handleDeleteImage(lightboxImage.id, e)} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-red-500 cursor-pointer" title="Delete Image"><Trash2 className="w-4 h-4" /></button>
+            <button onClick={() => setLightboxImage(null)} className="p-2 rounded-xl bg-glass-bg border border-color-border-color text-white hover:text-red-500 cursor-pointer" title="Close"><X className="w-5 h-5" /></button>
           </div>
           <button onClick={handlePrevLightbox} className="absolute left-6 p-3 rounded-full bg-glass-bg border border-color-border-color text-white hover:text-cyan-accent cursor-pointer"><ChevronLeft className="w-6 h-6" /></button>
           <div className="max-w-[70vw] max-h-[75vh] flex items-center justify-center overflow-hidden">
