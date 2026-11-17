@@ -269,7 +269,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
             {/* HTML5 video element with Continuous Autoplay */}
             <video
               ref={videoRef}
-              src={blobUrl}
+              src={blobUrl || undefined}
               autoPlay={isAutoPlay}
               loop={isLoop}
               muted={isMuted}
