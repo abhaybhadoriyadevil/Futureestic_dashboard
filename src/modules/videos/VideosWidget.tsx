@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Tv,
   Trash2,
+  RotateCw,
 } from 'lucide-react';
 
 interface VideosWidgetProps {
@@ -32,8 +33,10 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
-  const [showPlaylist, setShowPlaylist] = useState(true);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isAutoPlay, setIsAutoPlay] = useState(true);
+  const [isLoop, setIsLoop] = useState(true);
+  const [showPlaylist, setShowPlaylist] = useState(false);
   const [fileIds, setFileIds] = useState<string[]>([]);
   const [blobUrl, setBlobUrl] = useState<string>('');
 
@@ -54,6 +57,15 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
         }
         if (parsed.showPlaylist !== undefined) {
           setShowPlaylist(parsed.showPlaylist);
+        }
+        if (parsed.autoPlay !== undefined) {
+          setIsAutoPlay(parsed.autoPlay);
+        }
+        if (parsed.loop !== undefined) {
+          setIsLoop(parsed.loop);
+        }
+        if (parsed.muted !== undefined) {
+          setIsMuted(parsed.muted);
         }
       } catch (e) {
         setFileIds([]);
@@ -95,6 +107,59 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
       setActiveVideoId(videos[0].id);
     }
   }, [videos, activeVideoId, dataRef]);
+
+  // Continuous Auto-play trigger: plays immediately and loops all the time
+  useEffect(() => {
+    if (videoRef.current && blobUrl && isAutoPlay) {
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        // Fallback for strict browser autoplay policies: mute and play
+        if (videoRef.current) {
+          videoRef.current.muted = true;
+          setIsMuted(true);
+          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        }
+      });
+    }
+  }, [blobUrl, isAutoPlay]);
+
+  // Listen for CLI video control events
+  useEffect(() => {
+    const handleVideoControl = (e: any) => {
+      const { action, value } = e.detail || {};
+      if (action === 'play') {
+        if (value && videos.some(v => v.id === value || v.name.toLowerCase() === value.toLowerCase())) {
+          const match = videos.find(v => v.id === value || v.name.toLowerCase() === value.toLowerCase());
+          if (match) setActiveVideoId(match.id);
+        }
+        if (videoRef.current) {
+          videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+        }
+      } else if (action === 'pause') {
+        if (videoRef.current) {
+          videoRef.current.pause();
+          setIsPlaying(false);
+        }
+      } else if (action === 'stop') {
+        if (videoRef.current) {
+          videoRef.current.pause();
+          videoRef.current.currentTime = 0;
+          setIsPlaying(false);
+        }
+      } else if (action === 'autoplay') {
+        const next = value !== undefined ? Boolean(value) : !isAutoPlay;
+        setIsAutoPlay(next);
+        setIsLoop(next);
+        if (next && videoRef.current) {
+          videoRef.current.play().catch(() => {});
+        }
+      }
+    };
+
+    window.addEventListener('personal-os-video-control', handleVideoControl);
+    return () => window.removeEventListener('personal-os-video-control', handleVideoControl);
+  }, [videos, isAutoPlay]);
 
   // Handle play/pause commands
   const togglePlay = () => {
@@ -197,22 +262,28 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
     <div ref={containerRef2} className="w-full h-full flex text-xs text-primary-text bg-transparent overflow-hidden">
       
       {/* 1. Main Video Screen */}
-      <div className="flex-1 flex flex-col justify-between p-4 overflow-hidden">
+      <div className={`flex-1 flex flex-col justify-between ${activeVideo ? 'p-0' : 'p-4'} overflow-hidden relative`}>
         {activeVideo ? (
-          <div className="flex-1 w-full bg-black/60 rounded-xl border border-color-border-color overflow-hidden flex flex-col relative group/player">
+          <div className="flex-1 w-full bg-black overflow-hidden flex flex-col relative group/player">
             
-            {/* HTML5 video element */}
+            {/* HTML5 video element with Continuous Autoplay */}
             <video
               ref={videoRef}
               src={blobUrl}
+              autoPlay={isAutoPlay}
+              loop={isLoop}
+              muted={isMuted}
+              playsInline
               onTimeUpdate={handleTimeUpdate}
               onLoadedMetadata={handleLoadedMetadata}
+              onPlay={() => setIsPlaying(true)}
+              onPause={() => setIsPlaying(false)}
               onClick={togglePlay}
               className="w-full h-full object-contain bg-black cursor-pointer"
             />
 
-            {/* Custom Sci-fi Cyber Control HUD Bar overlay (visible on hover) */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent flex flex-col gap-2 opacity-0 group-hover/player:opacity-100 transition-opacity duration-300">
+            {/* Custom Sci-fi Cyber Control HUD Bar overlay (visible only on hover) */}
+            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/90 via-black/60 to-transparent flex flex-col gap-2 opacity-0 group-hover/container:opacity-100 group-hover/player:opacity-100 transition-opacity duration-300 z-20">
               
               {/* Progress Seek Scroller */}
               <div className="flex items-center gap-2">
@@ -229,12 +300,34 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
 
               {/* Control Buttons */}
               <div className="flex justify-between items-center text-[10px]">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <button onClick={togglePlay} className="text-white hover:text-cyan-accent cursor-pointer">
                     {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current" />}
                   </button>
                   <button onClick={handleVolumeToggle} className="text-white hover:text-cyan-accent cursor-pointer">
                     {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={async () => {
+                      const next = !isAutoPlay;
+                      setIsAutoPlay(next);
+                      setIsLoop(next);
+                      if (next && videoRef.current) {
+                        videoRef.current.play().catch(() => {});
+                      }
+                      await commitWidgetUpdate(widgetId, {
+                        dataRef: JSON.stringify({ fileIds, activeVideoId, showPlaylist, autoPlay: next, loop: next, muted: isMuted })
+                      });
+                    }}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                      isAutoPlay
+                        ? 'bg-cyan-accent text-black shadow-[0_0_8px_rgba(6,182,212,0.6)]'
+                        : 'bg-white/10 text-white/60 hover:text-white'
+                    }`}
+                    title={isAutoPlay ? 'Continuous Autoplay: ON (Playing all the time)' : 'Autoplay: OFF'}
+                  >
+                    <RotateCw className={`w-3 h-3 ${isAutoPlay ? 'animate-spin' : ''}`} style={{ animationDuration: '6s' }} />
+                    <span>AUTO</span>
                   </button>
                   <span className="text-white/80 font-mono">
                     {formatTime(currentTime)} / {formatTime(duration)}
@@ -267,7 +360,7 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
                       const newVal = !showPlaylist;
                       setShowPlaylist(newVal);
                       commitWidgetUpdate(widgetId, {
-                        dataRef: JSON.stringify({ fileIds, activeVideoId, showPlaylist: newVal })
+                        dataRef: JSON.stringify({ fileIds, activeVideoId, showPlaylist: newVal, autoPlay: isAutoPlay, loop: isLoop, muted: isMuted })
                       });
                     }}
                     className={`text-white hover:text-cyan-accent cursor-pointer ${showPlaylist ? 'text-cyan-accent' : ''}`}
@@ -318,9 +411,13 @@ export const VideosWidget: React.FC<VideosWidgetProps> = ({ widgetId, dataRef, s
                   key={v.id}
                   onClick={async () => {
                     setActiveVideoId(v.id);
-                    setIsPlaying(false);
+                    if (isAutoPlay) {
+                      setTimeout(() => {
+                        videoRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+                      }, 50);
+                    }
                     await commitWidgetUpdate(widgetId, {
-                      dataRef: JSON.stringify({ fileIds, activeVideoId: v.id, showPlaylist })
+                      dataRef: JSON.stringify({ fileIds, activeVideoId: v.id, showPlaylist, autoPlay: isAutoPlay, loop: isLoop, muted: isMuted })
                     });
                   }}
                   className={`w-full text-left p-2.5 rounded-xl border transition-all text-xs flex justify-between items-center cursor-pointer group/vitem ${

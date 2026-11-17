@@ -279,7 +279,7 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
                 className="max-h-full max-w-full w-auto h-auto object-contain rounded-lg shadow-lg transition-transform duration-300"
               />
               {/* Overlay controls in top right */}
-              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10 opacity-0 group-hover/container:opacity-100 transition-opacity duration-200">
                 <button
                   onClick={(e) => handleDeleteImage(selectedImage.id, e)}
                   className="p-1.5 rounded-xl bg-black/70 hover:bg-red-500/80 text-white/80 hover:text-white border border-white/10 hover:border-red-500 transition-all cursor-pointer shadow-md"
@@ -348,7 +348,7 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
           </div>
         ) : (
           /* Slideshow */
-          <div className="w-full h-full flex flex-col justify-between items-center bg-primary-bg/50 border border-color-border-color rounded-xl p-2 relative overflow-hidden min-h-0">
+          <div className="w-full h-full flex flex-col justify-between items-center bg-transparent rounded-xl p-0 relative overflow-hidden min-h-0">
             {images[currentIndex] ? (
               <div
                 className="flex-1 min-h-0 w-full flex items-center justify-center relative overflow-hidden cursor-pointer group/slide select-none"
@@ -365,14 +365,14 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
                 {/* Floating Previous & Next arrow buttons on hover */}
                 <button
                   onClick={e => { e.stopPropagation(); setCurrentIndex(p => (p - 1 + images.length) % images.length); }}
-                  className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent cursor-pointer transition-all z-10 opacity-70 group-hover/slide:opacity-100 shadow-md"
+                  className="absolute left-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent cursor-pointer transition-all z-10 opacity-0 group-hover/container:opacity-100 shadow-md"
                   title="Previous image"
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <button
                   onClick={e => { e.stopPropagation(); setCurrentIndex(p => (p + 1) % images.length); }}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent cursor-pointer transition-all z-10 opacity-70 group-hover/slide:opacity-100 shadow-md"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-black/60 hover:bg-black/90 text-white border border-white/10 hover:border-cyan-accent/50 hover:text-cyan-accent cursor-pointer transition-all z-10 opacity-0 group-hover/container:opacity-100 shadow-md"
                   title="Next image"
                 >
                   <ChevronRight className="w-4 h-4" />
@@ -380,8 +380,8 @@ export const ImagesWidget: React.FC<ImagesWidgetProps> = ({ widgetId, dataRef, s
               </div>
             ) : null}
 
-            {/* Bottom Controls Bar — ALWAYS visible with shrink-0, never pushed off */}
-            <div className="w-full h-8 shrink-0 flex items-center justify-between border-t border-color-border-color/60 pt-1 mt-1 z-10 px-1">
+            {/* Bottom Controls Bar — visible on hover so unhovered widget shows pure elements */}
+            <div className="absolute bottom-0 inset-x-0 h-9 shrink-0 flex items-center justify-between bg-black/80 backdrop-blur-md border-t border-white/10 px-2 z-10 opacity-0 group-hover/container:opacity-100 transition-opacity duration-200">
               <div className="flex items-center gap-1.5">
                 <button
                   onClick={handleTogglePlay}

@@ -236,6 +236,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
   const [rotation, setRotation] = useState(widget.rotation);
   const [widthInput, setWidthInput] = useState(Math.round(widget.size.w));
   const [heightInput, setHeightInput] = useState(Math.round(widget.size.h));
+  const [isHovered, setIsHovered] = useState(false);
 
   // Percentage position inputs
   const initialPct =
@@ -749,11 +750,16 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
     widget.animation?.entrance || "fade",
   );
 
+  // Controls & edges shown on hover, during dragging/resizing, or when dropdown is open
+  const showControlsAndEdges = isHovered || showDropdown || isDragging || isResizing;
+
   // For free/snap/canvas mode, use motion.div with entrance animation
   // For grid mode, the DashboardCanvas handles the wrapper animation
   const wrapperContent = (
     <div
       ref={containerRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       onPointerDown={handleDragStart}
       onPointerMove={isResizing ? handleResizeMove : handleDragMove}
       onPointerUp={isResizing ? handleResizeEnd : handleDragEnd}
@@ -766,9 +772,11 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
       className={`flex flex-col select-none group/container ${
         isFullscreenMode ? "w-full h-full relative" : "absolute"
       } ${
-        isSelected
+        showControlsAndEdges && isSelected
           ? "ring-2 ring-cyan-accent shadow-[0_0_20px_rgba(6,182,212,0.35)]"
-          : "hover:shadow-lg"
+          : showControlsAndEdges
+            ? "shadow-lg"
+            : ""
       } ${isDragging ? "cursor-grabbing z-[999]" : ""}`}
     >
       {/* Live Positioning HUD */}
@@ -809,17 +817,20 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           style={{
             ...getBackgroundStyle(),
             borderRadius: "9999px",
+            borderColor: showControlsAndEdges
+              ? (isSelected ? "rgba(6, 182, 212, 0.5)" : "var(--glass-border)")
+              : "transparent",
+            boxShadow: showControlsAndEdges ? undefined : "none",
+            transition: "border-color 0.2s ease, box-shadow 0.2s ease",
           }}
           onClick={(e) => {
             if (!isEditMode) {
               handleRestore(e);
             }
           }}
-          className={`w-full h-full flex items-center justify-between pl-4 pr-3 border transition-all duration-200 ${
-            isSelected
-              ? "border-cyan-accent/50 bg-cyan-accent/5 shadow-[0_0_15px_rgba(6,182,212,0.25)]"
-              : "border-color-border-color hover:border-white/10"
-          } ${backgroundType === "glass" ? "glass-panel" : ""}`}
+          className={`w-full h-full flex items-center justify-between pl-4 pr-3 border ${
+            backgroundType === "glass" ? "glass-panel" : ""
+          }`}
         >
           <div className="flex items-center gap-2 overflow-hidden flex-1 select-none pr-1">
             {getModuleIcon(widget.moduleType)}
@@ -853,19 +864,22 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
           style={{
             ...getBackgroundStyle(),
             borderRadius: isFullscreenMode ? "0px" : borderRadius,
+            borderColor: showControlsAndEdges
+              ? (isSelected ? "rgba(6, 182, 212, 0.5)" : "var(--glass-border)")
+              : "transparent",
+            boxShadow: showControlsAndEdges ? undefined : "none",
+            transition: "border-color 0.2s ease, box-shadow 0.2s ease",
           }}
-          className={`w-full h-full flex flex-col overflow-hidden relative border transition-all duration-200 ${
-            isFullscreenMode
-              ? "border-0"
-              : isSelected
-                ? "border-cyan-accent/40"
-                : "border-color-border-color hover:border-white/10"
+          className={`w-full h-full flex flex-col overflow-hidden relative border ${
+            isFullscreenMode ? "border-0" : ""
           } ${backgroundType === "glass" && !isFullscreenMode ? "glass-panel" : ""}`}
         >
-          {/* Floating Controls Overlay (Visible when active/selected) */}
-          {selectedWidgetId === widget.id && !isFullscreenMode && (
+          {/* Floating Controls Overlay (Visible when hovered) */}
+          {!isFullscreenMode && (
             <div
-              className="absolute top-2 right-2 flex items-center gap-1 p-1 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 z-[30] pointer-events-auto shadow-lg"
+              className={`absolute top-2 right-2 flex items-center gap-1 p-1 rounded-xl bg-black/70 backdrop-blur-md border border-white/10 z-[30] pointer-events-auto shadow-lg transition-opacity duration-200 ${
+                showControlsAndEdges ? "opacity-100" : "opacity-0 pointer-events-none"
+              }`}
               onPointerDown={(e) => e.stopPropagation()}
             >
               <button
@@ -1039,7 +1053,13 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
 
           {/* Resize Handles (multi-directional: se, e, s) */}
           {!isFullscreenMode && (
-            <>
+            <div
+              className={`transition-opacity duration-200 ${
+                showControlsAndEdges
+                  ? "opacity-100 pointer-events-auto"
+                  : "opacity-0 pointer-events-none"
+              }`}
+            >
               {/* Right edge handle */}
               <div
                 onPointerDown={(e) => handleResizeStart(e, "e")}
@@ -1073,7 +1093,7 @@ export const WidgetContainer: React.FC<WidgetContainerProps> = ({
                   <path d="M6 0h2v8h-8v-2h6z" />
                 </svg>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}

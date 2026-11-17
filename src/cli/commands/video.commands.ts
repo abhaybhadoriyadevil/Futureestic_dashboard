@@ -88,6 +88,29 @@ export const videoCommands: CommandDefinition[] = [
     },
   },
   {
+    id: 'video.autoplay',
+    name: 'video autoplay',
+    aliases: ['video loop'],
+    category: 'Videos',
+    description: 'Toggle or configure continuous video autoplay and loop.',
+    syntax: 'video autoplay [on|off]',
+    arguments: [
+      {
+        name: 'state',
+        description: 'Set autoplay state: "on" or "off" (or omit to toggle)',
+        required: false,
+      },
+    ],
+    examples: ['video autoplay', 'video autoplay on', 'video autoplay off'],
+    relatedCommands: ['video play', 'video stop'],
+    handler: (ctx) => {
+      const mode = ctx.args[0]?.toLowerCase().trim();
+      const val = mode === 'on' ? true : mode === 'off' ? false : undefined;
+      dispatchVideoEvent('autoplay', val);
+      ctx.addOutput('success', `Continuous video autoplay ${val !== undefined ? (val ? 'ENABLED' : 'DISABLED') : 'TOGGLED'}.`);
+    },
+  },
+  {
     id: 'video.fullscreen',
     name: 'video fullscreen',
     category: 'Videos',
