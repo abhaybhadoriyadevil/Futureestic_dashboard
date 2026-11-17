@@ -38,22 +38,27 @@ const fmt = (t: number) => {
 const VinylRecord: React.FC<{
   isPlaying: boolean;
   size: number;
+  showTonearm?: boolean;
   onClick?: () => void;
-}> = ({ isPlaying, size, onClick }) => {
+}> = ({ isPlaying, size, showTonearm = true, onClick }) => {
   return (
     <div
       onClick={onClick}
-      className={`relative shrink-0 rounded-full cursor-pointer select-none transition-all duration-500 group/vinyl ${
+      className={`relative shrink-0 rounded-full cursor-pointer select-none group/vinyl ${
         isPlaying
-          ? 'shadow-[0_0_25px_rgba(6,182,212,0.45)] ring-1 ring-cyan-accent/40'
-          : 'shadow-[0_0_12px_rgba(0,0,0,0.6)] ring-1 ring-white/10 hover:ring-cyan-accent/30'
+          ? 'shadow-[0_0_35px_rgba(6,182,212,0.45)] ring-1 ring-cyan-accent/40'
+          : 'shadow-[0_0_15px_rgba(0,0,0,0.6)] ring-1 ring-white/10 hover:ring-cyan-accent/30'
       }`}
-      style={{ width: size, height: size }}
+      style={{
+        width: `${size}px`,
+        height: `${size}px`,
+        transition: 'width 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), height 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), box-shadow 0.45s ease',
+      }}
       title={isPlaying ? 'Click to Pause' : 'Click to Play'}
     >
       {/* Vinyl Disc Body with continuous smooth rotation */}
       <div
-        className="w-full h-full rounded-full relative overflow-hidden flex items-center justify-center border border-white/10"
+        className="w-full h-full rounded-full relative overflow-hidden flex items-center justify-center border border-white/10 transition-all duration-500"
         style={{
           background: `
             radial-gradient(circle, 
@@ -92,9 +97,10 @@ const VinylRecord: React.FC<{
         <div
           className="rounded-full flex items-center justify-center shadow-lg relative z-10 border border-black/40"
           style={{
-            width: Math.round(size * 0.38),
-            height: Math.round(size * 0.38),
+            width: `${Math.round(size * 0.38)}px`,
+            height: `${Math.round(size * 0.38)}px`,
             background: 'radial-gradient(circle at 35% 35%, #06b6d4 0%, #3b82f6 50%, #8b5cf6 100%)',
+            transition: 'width 0.45s cubic-bezier(0.25, 0.1, 0.25, 1), height 0.45s cubic-bezier(0.25, 0.1, 0.25, 1)',
           }}
         >
           {/* Circular track ring on label */}
@@ -103,7 +109,11 @@ const VinylRecord: React.FC<{
           {/* Center spindle hole */}
           <div
             className="rounded-full bg-[#050507] border border-cyan-300/40 shadow-inner flex items-center justify-center"
-            style={{ width: Math.max(6, Math.round(size * 0.12)), height: Math.max(6, Math.round(size * 0.12)) }}
+            style={{
+              width: `${Math.max(6, Math.round(size * 0.12))}px`,
+              height: `${Math.max(6, Math.round(size * 0.12))}px`,
+              transition: 'width 0.45s ease, height 0.45s ease',
+            }}
           >
             <div className="w-1 h-1 rounded-full bg-cyan-accent" />
           </div>
@@ -111,9 +121,9 @@ const VinylRecord: React.FC<{
       </div>
 
       {/* Floating Stylus Tonearm Indicator in standard size */}
-      {size >= 80 && (
+      {size >= 80 && showTonearm && (
         <div 
-          className="absolute -top-1 -right-2 pointer-events-none transition-transform duration-500 origin-top-right z-20"
+          className="absolute -top-1 -right-2 pointer-events-none transition-all duration-500 origin-top-right z-20"
           style={{
             transform: isPlaying ? 'rotate(0deg)' : 'rotate(-18deg)'
           }}
@@ -134,9 +144,15 @@ const VinylRecord: React.FC<{
 export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, showControls = false }) => {
   const { commitWidgetUpdate } = useWidgetStore();
   const { ref: sizeRef, width, height } = useContainerSize();
-  const isCompact = height < 225 || width < 280;
-  const isTiny = height < 165 || width < 220;
+  const [isHovered, setIsHovered] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+
+  // Dynamic disc sizes: gets big when unhovered, shrinks when hovered
+  const bigDiscSize = Math.max(130, Math.min(width - 24, height - 24, 280));
+  const isCompact = height < 240 || width < 280;
+  const isTiny = height < 170 || width < 220;
+  const smallDiscSize = isCompact ? (isTiny ? 46 : 56) : (height > 340 ? 100 : 80);
+  const currentDiscSize = isHovered ? smallDiscSize : bigDiscSize;
 
   // ── persisted state ──────────────────────────────────
   const [fileIds, setFileIds] = useState<string[]>([]);
@@ -434,7 +450,7 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
           <div className="shrink-0 border-t border-color-border-color bg-glass-bg/20 px-3 py-1.5 flex items-center gap-2.5">
             <audio
               ref={audioRef}
-              src={blobUrl}
+              src={blobUrl || undefined}
               onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
               onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
               onEnded={handleEnded}
@@ -471,12 +487,17 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
   // PLAYER VIEW — default
   // ─────────────────────────────────────────────────────
   return (
-    <div ref={sizeRef} className={`w-full h-full flex flex-col ${isCompact ? 'p-2.5' : 'p-4'} text-xs text-primary-text bg-transparent overflow-hidden`}>
+    <div
+      ref={sizeRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="w-full h-full flex flex-col items-center justify-center p-2 sm:p-3 text-xs text-primary-text bg-transparent overflow-hidden relative select-none"
+    >
 
       {/* Hidden audio element */}
       <audio
         ref={audioRef}
-        src={blobUrl}
+        src={blobUrl || undefined}
         onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
         onLoadedMetadata={() => setDuration(audioRef.current?.duration ?? 0)}
         onEnded={handleEnded}
@@ -484,160 +505,34 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
       />
 
       {activeAudio ? (
-        isCompact ? (
-          /* ── COMPACT / SMALL WIDGET VIEW ───────────────────── */
-          <div className="flex-1 w-full h-full flex flex-col justify-between overflow-hidden min-h-0">
-            {/* Top section: Revolving Vinyl Disc + Track Details + Equalizer waves */}
-            <div className="flex items-center gap-2.5 min-w-0 shrink-0">
-              <VinylRecord
-                isPlaying={isPlaying}
-                size={isTiny ? 46 : 56}
-                onClick={togglePlay}
-              />
-
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-                <div className="flex items-center justify-between gap-1">
-                  <p className="font-bold text-xs text-primary-text truncate" title={activeAudio.name}>
-                    {activeAudio.name}
-                  </p>
-                  {/* Mini equalizer bars */}
-                  <div className="flex gap-0.5 items-end h-3 shrink-0">
-                    {[1, 2, 3, 4].map(i => (
-                      <div
-                        key={i}
-                        className={`w-0.5 bg-cyan-accent rounded-full transition-all duration-300 ${isPlaying ? 'animate-pulse' : 'opacity-30'}`}
-                        style={{
-                          height: isPlaying ? `${4 + (i % 2 === 0 ? 8 : 4)}px` : '3px',
-                          animationDuration: `${0.4 + i * 0.15}s`
-                        }}
-                      />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-muted-text font-mono">
-                  <span className="text-cyan-accent/80 font-semibold">{fmt(currentTime)} <span className="text-muted-text">/ {fmt(duration)}</span></span>
-                  <span className="text-[9px] text-muted-text">
-                    {audios.indexOf(activeAudio) + 1}/{audios.length}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Middle: Progress Scrub Bar */}
-            <div className="w-full flex items-center my-0.5 shrink-0">
-              <input
-                type="range"
-                min={0}
-                max={duration || 0}
-                step={0.1}
-                value={currentTime}
-                onChange={handleSeek}
-                className="w-full h-1 rounded-full appearance-none cursor-pointer accent-cyan-400 bg-white/10 hover:bg-white/20 transition-colors"
-              />
-            </div>
-
-            {/* Bottom: Playback Controls */}
-            <div className="flex items-center justify-between pt-0.5 shrink-0">
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={skipPrev}
-                  className="p-1 rounded-lg text-secondary-text hover:text-primary-text hover:bg-glass-bg cursor-pointer transition-colors"
-                  title="Previous Track"
-                >
-                  <SkipBack className="w-3.5 h-3.5" />
-                </button>
-
-                <button
-                  onClick={togglePlay}
-                  className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-accent to-blue-500 text-black flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-[0_0_12px_rgba(6,182,212,0.4)]"
-                  title={isPlaying ? 'Pause' : 'Play'}
-                >
-                  {isPlaying ? (
-                    <Pause className="w-3.5 h-3.5" />
-                  ) : (
-                    <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                  )}
-                </button>
-
-                <button
-                  onClick={skipNext}
-                  className="p-1 rounded-lg text-secondary-text hover:text-primary-text hover:bg-glass-bg cursor-pointer transition-colors"
-                  title="Next Track"
-                >
-                  <SkipForward className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Secondary icons */}
-              <div className="flex items-center gap-0.5 text-muted-text">
-                <button
-                  onClick={toggleLoop}
-                  className={`p-1 rounded-lg cursor-pointer transition-colors ${
-                    isLoop ? 'text-cyan-accent bg-cyan-accent/10' : 'hover:text-primary-text'
-                  }`}
-                  title={isLoop ? 'Loop: On' : 'Loop: Off'}
-                >
-                  <Repeat className="w-3 h-3" />
-                </button>
-
-                <button
-                  onClick={() => toggleView('playlist')}
-                  className="p-1 rounded-lg hover:text-primary-text cursor-pointer transition-colors"
-                  title="Playlist"
-                >
-                  <List className="w-3 h-3" />
-                </button>
-
-                {showControls && (
-                  <label
-                    className="p-1 rounded-lg hover:text-cyan-accent cursor-pointer transition-colors"
-                    title="Upload Audio"
-                  >
-                    <Upload className="w-3 h-3" />
-                    <input
-                      type="file"
-                      accept="audio/*,.mp3,.wav,.ogg,.flac,.aac"
-                      onChange={handleUpload}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-
-                <button
-                  onClick={() => setIsMuted(m => !m)}
-                  className="p-1 rounded-lg hover:text-primary-text cursor-pointer transition-colors"
-                  title={isMuted ? 'Unmute' : 'Mute'}
-                >
-                  {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5" />}
-                </button>
-
-                <button
-                  onClick={(e) => activeAudio && handleDelete(activeAudio.id, e)}
-                  className="p-1 rounded-lg text-muted-text hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
-                  title="Delete Track"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
+        <div className="w-full h-full flex flex-col items-center justify-between overflow-hidden relative">
+          
+          {/* Centered Vinyl Record container */}
+          <div className={`relative flex items-center justify-center transition-all duration-500 ease-out ${
+            isHovered ? 'shrink-0 my-1' : 'flex-1 my-auto'
+          }`}>
+            <VinylRecord
+              isPlaying={isPlaying}
+              size={currentDiscSize}
+              showTonearm={isHovered}
+              onClick={togglePlay}
+            />
           </div>
-        ) : (
-          /* ── STANDARD / LARGE WIDGET VIEW ──────────────────── */
-          <div className="flex-1 w-full h-full flex flex-col items-center justify-between py-1 overflow-hidden min-h-0">
-            {/* Centered Vinyl Record with Stylus */}
-            <div className="relative my-auto flex items-center justify-center">
-              <VinylRecord
-                isPlaying={isPlaying}
-                size={height > 340 ? 120 : height > 280 ? 96 : 80}
-                onClick={togglePlay}
-              />
-            </div>
 
-            {/* Track details & Equalizer */}
-            <div className="text-center px-2 w-full shrink-0 mb-2">
+          {/* Controls & Options Overlay — visible only on hover */}
+          <div
+            className={`w-full flex flex-col items-center justify-end transition-all duration-300 ease-out ${
+              isHovered
+                ? 'opacity-100 max-h-[350px] pointer-events-auto pb-1'
+                : 'opacity-0 max-h-0 pointer-events-none overflow-hidden'
+            }`}
+          >
+            {/* Track Title & Equalizer */}
+            <div className="text-center px-2 w-full shrink-0 mb-1">
               <div className="flex items-center justify-center gap-2">
-                <p className="font-bold text-sm text-primary-text truncate max-w-[240px]">{activeAudio.name}</p>
+                <p className="font-bold text-xs sm:text-sm text-primary-text truncate max-w-[240px]">
+                  {activeAudio.name}
+                </p>
                 <div className="flex gap-0.5 items-end h-3 shrink-0">
                   {[1, 2, 3, 4].map(i => (
                     <div
@@ -656,51 +551,62 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
               </p>
             </div>
 
-            {/* Progress bar */}
-            <div className="w-full max-w-xs flex items-center gap-2 shrink-0 mb-2">
-              <span className="text-[9px] font-mono text-muted-text w-8 shrink-0 text-right">{fmt(currentTime)}</span>
+            {/* Progress Scrub Bar */}
+            <div className="w-full max-w-xs flex items-center gap-2 shrink-0 mb-1.5 px-2">
+              <span className="text-[9px] font-mono text-muted-text w-7 shrink-0 text-right">{fmt(currentTime)}</span>
               <input
-                type="range" min={0} max={duration || 0} step={0.1} value={currentTime}
+                type="range"
+                min={0}
+                max={duration || 0}
+                step={0.1}
+                value={currentTime}
                 onChange={handleSeek}
                 className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer accent-cyan-400 bg-white/10 hover:bg-white/20 transition-colors"
               />
-              <span className="text-[9px] font-mono text-muted-text w-8 shrink-0">{fmt(duration)}</span>
+              <span className="text-[9px] font-mono text-muted-text w-7 shrink-0">{fmt(duration)}</span>
             </div>
 
             {/* Primary Controls */}
-            <div className="flex items-center gap-3 shrink-0 mb-2">
-              <button onClick={toggleLoop} title={isLoop ? 'Loop ON' : 'Loop OFF'}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isLoop ? 'text-cyan-accent bg-cyan-accent/10' : 'text-muted-text hover:text-secondary-text'}`}>
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0 mb-1.5">
+              <button
+                onClick={toggleLoop}
+                title={isLoop ? 'Loop ON' : 'Loop OFF'}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isLoop ? 'text-cyan-accent bg-cyan-accent/10' : 'text-muted-text hover:text-secondary-text'
+                }`}
+              >
                 <Repeat className="w-3.5 h-3.5" />
               </button>
-
-              <button onClick={skipPrev} className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors" title="Previous Track">
+              <button
+                onClick={skipPrev}
+                className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
+                title="Previous Track"
+              >
                 <SkipBack className="w-4 h-4" />
               </button>
-
               <button
                 onClick={togglePlay}
-                className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-accent to-blue-500 text-black flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-[0_0_20px_rgba(6,182,212,0.4)]"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-cyan-accent to-blue-500 text-black flex items-center justify-center cursor-pointer hover:scale-105 transition-transform shadow-[0_0_20px_rgba(6,182,212,0.4)]"
                 title={isPlaying ? 'Pause' : 'Play'}
               >
-                {isPlaying
-                  ? <Pause className="w-4 h-4" />
-                  : <Play className="w-4 h-4 fill-current ml-0.5" />
-                }
+                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 fill-current ml-0.5" />}
               </button>
-
-              <button onClick={skipNext} className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors" title="Next Track">
+              <button
+                onClick={skipNext}
+                className="p-1.5 rounded-lg text-secondary-text hover:text-primary-text cursor-pointer transition-colors"
+                title="Next Track"
+              >
                 <SkipForward className="w-4 h-4" />
               </button>
-
               <button
                 onClick={toggleShuffle}
                 title={isShuffle ? 'Shuffle ON' : 'Shuffle OFF'}
-                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${isShuffle ? 'text-purple-400 bg-purple-400/10' : 'text-muted-text hover:text-secondary-text'}`}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isShuffle ? 'text-purple-400 bg-purple-400/10' : 'text-muted-text hover:text-secondary-text'
+                }`}
               >
                 <Shuffle className="w-3.5 h-3.5" />
               </button>
-
               <button
                 onClick={() => toggleView('playlist')}
                 title="Open playlist"
@@ -708,39 +614,57 @@ export const AudioWidget: React.FC<AudioWidgetProps> = ({ widgetId, dataRef, sho
               >
                 <List className="w-4 h-4" />
               </button>
-
               {showControls && (
-                <label className="p-1.5 rounded-lg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors" title="Upload Audio">
+                <label
+                  className="p-1.5 rounded-lg text-secondary-text hover:text-cyan-accent cursor-pointer transition-colors"
+                  title="Upload Audio"
+                >
                   <Upload className="w-4 h-4" />
-                  <input type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.aac" onChange={handleUpload} className="hidden" />
+                  <input
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.ogg,.flac,.aac"
+                    onChange={handleUpload}
+                    className="hidden"
+                  />
                 </label>
               )}
-
               <button
                 onClick={(e) => activeAudio && handleDelete(activeAudio.id, e)}
                 className="p-1.5 rounded-lg text-secondary-text hover:text-red-400 hover:bg-red-500/10 cursor-pointer transition-colors"
                 title="Delete Track"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
 
             {/* Volume + Mute */}
             <div className="flex items-center gap-2 w-full max-w-xs shrink-0 px-2">
-              <button onClick={() => setIsMuted(m => !m)} className="text-muted-text hover:text-primary-text cursor-pointer shrink-0" title={isMuted ? 'Unmute' : 'Mute'}>
+              <button
+                onClick={() => setIsMuted(m => !m)}
+                className="text-muted-text hover:text-primary-text cursor-pointer shrink-0"
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
                 {isMuted ? <VolumeX className="w-3.5 h-3.5 text-red-400" /> : <Volume2 className="w-3.5 h-3.5" />}
               </button>
               <input
-                type="range" min={0} max={1} step={0.02} value={isMuted ? 0 : volume}
-                onChange={e => { const v = parseFloat(e.target.value); setVolume(v); setIsMuted(v === 0); }}
+                type="range"
+                min={0}
+                max={1}
+                step={0.02}
+                value={isMuted ? 0 : volume}
+                onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  setVolume(v);
+                  setIsMuted(v === 0);
+                }}
                 className="flex-1 h-1 cursor-pointer accent-cyan-400"
               />
             </div>
           </div>
-        )
+        </div>
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-text border border-dashed border-color-border-color rounded-xl p-3">
-          <VinylRecord isPlaying={false} size={isCompact ? 46 : 64} />
+          <VinylRecord isPlaying={false} size={isHovered ? 64 : bigDiscSize} showTonearm={false} />
           {!isTiny && <span className="text-center italic text-[11px] px-2">No audio loaded. Upload a track to start.</span>}
           {showControls && (
             <label className="px-2.5 py-1 rounded-lg border border-dashed border-color-border-color hover:border-cyan-accent font-semibold flex items-center gap-1.5 cursor-pointer hover:bg-cyan-accent/5 transition-colors text-[10px] text-cyan-accent">
